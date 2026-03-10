@@ -1,15 +1,36 @@
+# API framework
 fastapi==0.111.0
-uvicorn==0.29.0
+uvicorn[standard]==0.29.0
+python-multipart==0.0.9
+pydantic==2.7.1
+
+# Environment
 python-dotenv==1.0.1
-praw==7.7.1
-pytrends==4.9.2
+
+# Groq LLM
 groq==0.9.0
+
+# HTTP
 requests==2.31.0
+
+# Reddit
+praw==7.7.1
+
+# Google Trends
+pytrends==4.9.2
+
+# Video / Audio
 moviepy==1.0.3
+ffmpeg-python==0.2.0
+
+# Subtitles
 pysrt==1.1.2
+
+# YouTube upload
 google-auth==2.29.0
 google-auth-oauthlib==1.2.0
+google-auth-httplib2==0.2.0
 google-api-python-client==2.127.0
-spacy==3.7.4
+
+# NLP keyword extraction
 nltk==3.8.1
-snscrape==0.7.0.20230622

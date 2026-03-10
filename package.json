@@ -4,10 +4,12 @@
   "description": "AI-powered automated short video creation desktop app",
   "main": "frontend/electron/main.js",
   "scripts": {
-    "dev": "concurrently \"vite --config frontend/vite.config.js\" \"electron frontend/electron/main.js\"",
+    "dev:vite": "vite --config frontend/vite.config.js",
+    "dev:electron": "wait-on http://localhost:5173 && electron frontend/electron/main.js",
+    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
     "build": "vite build --config frontend/vite.config.js",
-    "electron": "electron frontend/electron/main.js",
-    "start": "concurrently \"npm run dev\" \"cd backend && uvicorn main:app --reload --port 8000\""
+    "preview": "vite preview --config frontend/vite.config.js",
+    "backend": "cd backend && uvicorn main:app --reload --port 8000"
   },
   "dependencies": {
     "react": "^18.2.0",
@@ -18,6 +20,7 @@
     "@vitejs/plugin-react": "^4.2.1",
     "concurrently": "^8.2.2",
     "electron": "^30.0.1",
-    "vite": "^5.2.10"
+    "vite": "^5.2.10",
+    "wait-on": "^7.2.0"
   }
 }
