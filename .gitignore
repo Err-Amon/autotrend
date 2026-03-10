@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+node_modules/
+backend/storage/audio/
+backend/storage/clips/
+backend/storage/final_videos/
+backend/storage/scripts/
+backend/storage/subtitles/
+*.log
+.DS_Store
+dist/
+build/

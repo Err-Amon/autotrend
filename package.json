@@ -1,0 +1,23 @@
+{
+  "name": "auto-video-factory",
+  "version": "1.0.0",
+  "description": "AI-powered automated short video creation desktop app",
+  "main": "frontend/electron/main.js",
+  "scripts": {
+    "dev": "concurrently \"vite --config frontend/vite.config.js\" \"electron frontend/electron/main.js\"",
+    "build": "vite build --config frontend/vite.config.js",
+    "electron": "electron frontend/electron/main.js",
+    "start": "concurrently \"npm run dev\" \"cd backend && uvicorn main:app --reload --port 8000\""
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "axios": "^1.6.8"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.2.1",
+    "concurrently": "^8.2.2",
+    "electron": "^30.0.1",
+    "vite": "^5.2.10"
+  }
+}
