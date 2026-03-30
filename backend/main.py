@@ -17,14 +17,19 @@ app.add_middleware(
 
 app.include_router(router, prefix="/api")
 
+
 @app.on_event("startup")
 async def on_startup():
     missing = validate_env()
     if missing:
-        logger.warning(f"Missing required env keys: {missing}. Pipeline will fail until these are set.")
+        logger.warning(
+            f"Missing required env keys: {missing}. Pipeline will fail until these are set."
+        )
     else:
         logger.info("Environment validated. All required keys present.")
 
+
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

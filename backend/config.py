@@ -32,7 +32,10 @@ INSTAGRAM_USER_ID: str = os.getenv("INSTAGRAM_USER_ID", "")
 # Piper TTS
 PIPER_EXECUTABLE: str = os.getenv("PIPER_EXECUTABLE", "piper")
 PIPER_MODEL: str = os.getenv("PIPER_MODEL", "en_US-lessac-medium")
-PIPER_MODEL_PATH: str = os.getenv("PIPER_MODEL_PATH", str(PROJECT_ROOT / "models" / "en_US-lessac-medium.onnx"))
+PIPER_MODEL_PATH: str = os.getenv(
+    "PIPER_MODEL_PATH",
+    str(PROJECT_ROOT / "models" / "en_US-lessac-medium.onnx"),
+)
 
 # Logging
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
@@ -63,6 +66,7 @@ VIDEO_FPS: int = 30
 
 # Minimum required keys for pipeline to run
 REQUIRED_KEYS: list[str] = ["GROQ_API_KEY", "PEXELS_API_KEY"]
+
 
 def validate_env() -> list[str]:
     return [k for k in REQUIRED_KEYS if not os.getenv(k)]

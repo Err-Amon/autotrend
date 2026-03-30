@@ -2,7 +2,7 @@ import logging
 import os
 from pathlib import Path
 
-# Resolve logs dir relative to this file, not the working directory
+# Resolve logs dir relative to this file — safe regardless of working directory
 _LOG_DIR = Path(__file__).resolve().parent.parent.parent / "logs"
 _LOG_DIR.mkdir(parents=True, exist_ok=True)
 _LOG_FILE = str(_LOG_DIR / "app.log")
@@ -17,6 +17,7 @@ logging.basicConfig(
         logging.StreamHandler(),
     ],
 )
+
 
 def get_logger(name: str) -> logging.Logger:
     return logging.getLogger(name)

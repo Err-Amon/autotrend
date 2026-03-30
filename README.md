@@ -11,24 +11,6 @@ AI-powered desktop tool for fully automated short video creation and upload.
 - **Multi-platform upload**: Supports YouTube, Facebook, Instagram
 - **Desktop app**: Built with Electron for a native experience
 
-## Quick Start
-
-See [`SETUP.md`](SETUP.md) for detailed installation and setup instructions.
-
-### Verify Setup
-
-Run the verification script to check your installation:
-
-```bash
-uv run python verify_setup.py
-```
-
-This will check:
-- Python version and dependencies
-- Required directories
-- Environment configuration
-- FFmpeg installation
-
 ### Backend
 ```bash
 cd backend && uv run uvicorn main:app --reload --port 8000
