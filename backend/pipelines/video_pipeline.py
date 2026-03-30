@@ -12,81 +12,179 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-def run_pipeline(niche: str, platforms: list[str], upload_config: dict, on_progress=None) -> dict:
-    job_id = str(uuid.uuid4())[:8]
-    result = {"job_id": job_id, "status": "started", "error": None, "video_path": None, "uploads": {}}
+# Pipeline step labels — used for progress callbacks and logging
+STEPS = [
+    "collecting_trends",
+    "filtering_trends",
+    "generating_script",
+    "generating_voice",
+    "fetching_clips",
+    "generating_subtitles",
+    "assembling_video",
+    "uploading",
+    "complete",
+]
 
-    def progress(step: str):
-        logger.info(f"[{job_id}] {step}")
+
+def run_pipeline(
+    niche: str,
+    platforms: list[str],
+    upload_config: dict,
+    on_progress: callable = None,
+) -> dict:
+    job_id = str(uuid.uuid4())[:8]
+    result = {
+        "job_id": job_id,
+        "niche": niche,
+        "status": "started",
+        "step": "",
+        "error": None,
+        "video_path": None,
+        "uploads": {},
+    }
+
+    def progress(step: str, detail: str = ""):
+        result["step"] = step
+        msg = f"[{job_id}] {step}" + (f": {detail}" if detail else "")
+        logger.info(msg)
         if on_progress:
-            on_progress(job_id, step)
+            try:
+                on_progress(job_id, step, detail)
+            except Exception as e:
+                logger.warning(f"Progress callback error: {e}")
 
     try:
         ensure_storage_dirs()
 
-        progress("Collecting trends")
+        progress("collecting_trends", niche)
         trends = collect_trends(niche)
         if not trends:
-            raise ValueError("No trends collected")
+            raise PipelineError(
+                "No trends could be collected. Check API credentials and network."
+            )
 
-        progress("Filtering trends for niche")
+        progress("filtering_trends", f"{len(trends)} raw trends")
         filtered = filter_trends_for_niche(trends, niche)
-        topic = filtered[0] if filtered else trends[0]
+        if not filtered:
+            raise PipelineError("Trend filtering returned no results.")
 
-        progress(f"Generating script for: {topic}")
+        topic = filtered[0]
+        logger.info(f"[{job_id}] Selected topic: '{topic}'")
+
+        progress("generating_script", topic)
         script = generate_script(topic, niche, job_id)
         if not script:
-            raise ValueError("Script generation failed")
+            raise PipelineError(f"Script generation failed for topic: '{topic}'")
 
-        progress("Generating voice narration")
+        progress("generating_voice")
         audio_path = generate_voice(script, job_id)
         if not audio_path:
-            raise ValueError("Voice generation failed")
+            raise PipelineError(
+                "Voice generation failed. Ensure Piper TTS is installed and the model file exists."
+            )
 
-        progress("Fetching stock video clips")
+        progress("fetching_clips", topic)
         clips = fetch_clips_for_script(script, job_id)
         if not clips:
-            raise ValueError("No video clips fetched")
+            raise PipelineError(
+                "No video clips could be fetched. Check PEXELS_API_KEY and PIXABAY_API_KEY."
+            )
 
-        progress("Generating subtitles")
-        duration = get_audio_duration(audio_path)
-        subtitle_path = generate_subtitles(script, duration, job_id)
+        progress("generating_subtitles")
+        audio_duration = get_audio_duration(audio_path)
+        subtitle_path = generate_subtitles(script, audio_duration, job_id)
+        if not subtitle_path:
+            logger.warning(f"[{job_id}] Subtitles failed — continuing without them")
 
-        progress("Assembling final video")
+        progress("assembling_video")
         video_path = assemble_video(clips, audio_path, subtitle_path, job_id)
         if not video_path:
-            raise ValueError("Video assembly failed")
+            raise PipelineError("Video assembly failed. Check FFmpeg installation.")
 
         result["video_path"] = video_path
         result["status"] = "assembled"
+        logger.info(f"[{job_id}] Video assembled: {video_path}")
 
         if platforms:
-            progress("Uploading to platforms")
-            uploads = upload_to_platforms(video_path, script, niche, platforms, upload_config)
+            progress("uploading", ", ".join(platforms))
+            uploads = upload_to_platforms(
+                video_path, script, niche, platforms, upload_config
+            )
             result["uploads"] = uploads
-
+        else:
+            logger.info(f"[{job_id}] No platforms selected, skipping upload")
         result["status"] = "complete"
-        progress("Pipeline complete")
+        progress("complete", video_path)
 
-    except Exception as e:
-        logger.error(f"[{job_id}] Pipeline failed: {e}")
+    except PipelineError as e:
+        logger.error(f"[{job_id}] Pipeline error: {e}")
         result["status"] = "failed"
         result["error"] = str(e)
+
+    except Exception as e:
+        logger.error(f"[{job_id}] Unexpected pipeline failure: {e}", exc_info=True)
+        result["status"] = "failed"
+        result["error"] = f"Unexpected error: {e}"
+
     finally:
-        clean_job_files(job_id)
+        # Always clean up temp files regardless of outcome
+        try:
+            clean_job_files(job_id)
+        except Exception as e:
+            logger.warning(f"[{job_id}] Cleanup failed: {e}")
 
     return result
 
 
-def run_queue(jobs: list[dict], on_progress=None) -> list[dict]:
+def run_queue(
+    jobs: list[dict],
+    on_progress: callable = None,
+    on_job_complete: callable = None,
+) -> list[dict]:
+    if not jobs:
+        logger.warning("Queue received with no jobs")
+        return []
+
     results = []
-    for job in jobs:
-        logger.info(f"Starting job: {job}")
+    total = len(jobs)
+    logger.info(f"Queue started: {total} job(s)")
+
+    for index, job in enumerate(jobs):
+        niche = job.get("niche", "Technology")
+        platforms = job.get("platforms", [])
+        upload_config = job.get("upload_config", {})
+
+        logger.info(f"Queue: starting job {index + 1}/{total} — niche={niche}")
+
         result = run_pipeline(
-            niche=job.get("niche", "Technology"),
-            platforms=job.get("platforms", []),
-            upload_config=job.get("upload_config", {}),
+            niche=niche,
+            platforms=platforms,
+            upload_config=upload_config,
             on_progress=on_progress,
         )
+
         results.append(result)
+
+        if on_job_complete:
+            try:
+                on_job_complete(index, total, result)
+            except Exception as e:
+                logger.warning(f"on_job_complete callback error: {e}")
+
+        status = result.get("status")
+        logger.info(
+            f"Queue: job {index + 1}/{total} finished "
+            f"(status={status}, job_id={result.get('job_id')})"
+        )
+
+    completed = sum(1 for r in results if r["status"] == "complete")
+    failed = sum(1 for r in results if r["status"] == "failed")
+    logger.info(
+        f"Queue complete — {completed} succeeded, {failed} failed out of {total}"
+    )
+
     return results
+
+
+class PipelineError(Exception):
+    pass
