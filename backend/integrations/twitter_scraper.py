@@ -3,10 +3,6 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# snscrape is no longer reliable due to Twitter/X API restrictions.
-# This module uses the free Nitter RSS fallback instead.
-# Nitter instances are public mirrors of Twitter content.
-
 NITTER_INSTANCES = [
     "https://nitter.net",
     "https://nitter.privacydev.net",

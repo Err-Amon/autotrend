@@ -15,11 +15,6 @@ def upload_to_instagram(
     caption: str,
     ig_user_id: str = "",
 ) -> str | None:
-    """
-    Upload a Reel to Instagram via the Meta Graph API.
-    video_url must be a publicly accessible HTTPS URL.
-    Instagram does not support direct file upload — the video must be hosted.
-    """
     if not INSTAGRAM_ACCESS_TOKEN:
         logger.error("INSTAGRAM_ACCESS_TOKEN is not set")
         return None
