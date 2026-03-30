@@ -12,11 +12,6 @@ GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
 PEXELS_API_KEY: str = os.getenv("PEXELS_API_KEY", "")
 PIXABAY_API_KEY: str = os.getenv("PIXABAY_API_KEY", "")
 
-# Reddit
-REDDIT_CLIENT_ID: str = os.getenv("REDDIT_CLIENT_ID", "")
-REDDIT_SECRET: str = os.getenv("REDDIT_SECRET", "")
-REDDIT_USER_AGENT: str = os.getenv("REDDIT_USER_AGENT", "AutoTrendBot/1.0")
-
 # YouTube
 YOUTUBE_CLIENT_ID: str = os.getenv("YOUTUBE_CLIENT_ID", "")
 YOUTUBE_CLIENT_SECRET: str = os.getenv("YOUTUBE_CLIENT_SECRET", "")

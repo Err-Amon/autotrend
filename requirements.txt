@@ -10,11 +10,8 @@ python-dotenv==1.0.1
 # Groq LLM
 groq==0.9.0
 
-# HTTP
+# HTTP (also used for RSS fetching)
 requests==2.31.0
-
-# Reddit
-praw==7.7.1
 
 # Google Trends
 pytrends==4.9.2

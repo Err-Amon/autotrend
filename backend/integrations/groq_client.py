@@ -5,7 +5,7 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
-MODEL = "llama3-8b-8192"
+MODEL = "llama-3.1-8b-instant"
 
 
 def groq_chat(messages: list[dict], max_tokens: int = 1024) -> str | None:
