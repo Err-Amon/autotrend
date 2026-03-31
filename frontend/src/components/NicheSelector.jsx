@@ -1,10 +1,10 @@
 const NICHE_ICONS = {
-  "Islamic History": "🕌",
-  "Technology":      "💻",
-  "Motivation":      "🔥",
-  "Animals":         "🐾",
-  "Finance":         "💰",
-  "Space & Science": "🚀",
+  "Islamic History": "",
+  "Technology":      "",
+  "Motivation":      "",
+  "Animals":         "",
+  "Finance":         "",
+  "Space & Science": "",
 };
 
 export default function NicheSelector({ niches = [], selected, onSelect }) {
@@ -42,7 +42,7 @@ export default function NicheSelector({ niches = [], selected, onSelect }) {
                 transition: "all 0.15s",
               }}
             >
-              <span>{NICHE_ICONS[niche] || "📌"}</span>
+              <span>{NICHE_ICONS[niche] || ""}</span>
               {niche}
             </button>
           );

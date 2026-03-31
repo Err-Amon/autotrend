@@ -1,7 +1,7 @@
 const PLATFORMS = [
-  { id: "youtube",   label: "YouTube Shorts",   icon: "▶" },
-  { id: "instagram", label: "Instagram Reels",  icon: "📸" },
-  { id: "facebook",  label: "Facebook Reels",   icon: "👍" },
+  { id: "youtube",   label: "YouTube Shorts",   icon: "" },
+  { id: "instagram", label: "Instagram Reels",  icon: "" },
+  { id: "facebook",  label: "Facebook Reels",   icon: "" },
 ];
 
 export default function PlatformSelector({ selected = [], onToggle }) {
