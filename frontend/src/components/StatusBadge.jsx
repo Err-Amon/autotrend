@@ -1,23 +1,28 @@
+const STATUS_STYLES = {
+  queued:    { bg: "#f59e0b", label: "Queued" },
+  running:   { bg: "#3b82f6", label: "Running" },
+  assembled: { bg: "#8b5cf6", label: "Assembled" },
+  complete:  { bg: "#10b981", label: "Complete" },
+  failed:    { bg: "#ef4444", label: "Failed" },
+};
+
 export default function StatusBadge({ status }) {
-  const colors = {
-    queued: "#f59e0b",
-    running: "#3b82f6",
-    assembled: "#8b5cf6",
-    complete: "#10b981",
-    failed: "#ef4444",
-  };
-  const color = colors[status] || "#6b7280";
+  const style = STATUS_STYLES[status] || { bg: "#475569", label: status };
+
   return (
     <span style={{
-      backgroundColor: color,
-      color: "#fff",
+      display: "inline-block",
       padding: "2px 10px",
       borderRadius: "999px",
-      fontSize: "12px",
-      fontWeight: 600,
+      background: style.bg,
+      color: "#fff",
+      fontSize: "11px",
+      fontWeight: 700,
+      letterSpacing: "0.04em",
       textTransform: "uppercase",
+      whiteSpace: "nowrap",
     }}>
-      {status}
+      {style.label}
     </span>
   );
 }

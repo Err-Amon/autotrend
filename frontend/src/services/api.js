@@ -1,11 +1,50 @@
 import axios from "axios";
 
-const BASE_URL = "http://localhost:8000/api";
-const api = axios.create({ baseURL: BASE_URL, timeout: 30000 });
+const client = axios.create({
+  baseURL: "http://localhost:8000/api",
+  timeout: 30000,
+  headers: { "Content-Type": "application/json" },
+});
 
-export const getNiches = () => api.get("/niches");
-export const generateVideo = (niche, platforms, uploadConfig) =>
-  api.post("/generate", { niche, platforms, upload_config: uploadConfig });
-export const queueVideos = (jobs) => api.post("/queue", { jobs });
-export const getJobStatus = (jobId) => api.get(`/status/${jobId}`);
-export const getAllJobs = () => api.get("/jobs");
+// Intercept errors globally so components only handle business logic
+client.interceptors.response.use(
+  (res) => res,
+  (err) => {
+    const message =
+      err.response?.data?.detail ||
+      err.response?.data?.message ||
+      err.message ||
+      "Unknown error";
+    return Promise.reject(new Error(message));
+  }
+);
+
+export const api = {
+  health: () =>
+    client.get("/health"),
+
+  getNiches: () =>
+    client.get("/niches"),
+
+  generateVideo: (niche, platforms = [], uploadConfig = {}) =>
+    client.post("/generate", {
+      niche,
+      platforms,
+      upload_config: uploadConfig,
+    }),
+
+  queueVideos: (jobs) =>
+    client.post("/queue", { jobs }),
+
+  getJobStatus: (jobId) =>
+    client.get(`/status/${jobId}`),
+
+  getAllJobs: () =>
+    client.get("/jobs"),
+
+  deleteJob: (jobId) =>
+    client.delete(`/jobs/${jobId}`),
+
+  clearJobs: () =>
+    client.delete("/jobs"),
+};
