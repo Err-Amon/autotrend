@@ -6,6 +6,63 @@ logger = get_logger(__name__)
 
 HEADERS = {"User-Agent": "AutoTrendBot/1.0"}
 
+# Shared promotional-content blocklist (same logic as news_rss_client)
+_AD_BLOCKLIST = {
+    "sponsored",
+    "advertisement",
+    "advertorial",
+    "promoted",
+    "promotion",
+    "buy now",
+    "shop now",
+    "sale",
+    "discount",
+    "coupon",
+    "promo code",
+    "free trial",
+    "sign up",
+    "subscribe now",
+    "limited offer",
+    "limited time",
+    "best deal",
+    "best price",
+    "cheap",
+    "affordable",
+    "get started",
+    "enroll now",
+    "enroll today",
+    "register now",
+    "join now",
+    "course",
+    "bootcamp",
+    "masterclass",
+    "webinar",
+    "workshop",
+    "learn how to",
+    "how to make money",
+    "earn money",
+    "passive income",
+    "make $",
+    "earn $",
+    "get paid",
+    "work from home",
+    "affiliate",
+    "referral",
+    "partner",
+    "sponsored by",
+    "ad:",
+    "[ad]",
+    "[sponsored]",
+    "[promo]",
+}
+
+
+def _is_promotional(text: str) -> bool:
+    """Return True if the title looks like an ad or promotional content."""
+    lower = text.lower()
+    return any(kw in lower for kw in _AD_BLOCKLIST)
+
+
 # YouTube channel RSS feeds per niche — Google's own public endpoints, no key needed
 YOUTUBE_CATEGORY_RSS: dict[str, str] = {
     "Technology": "https://www.youtube.com/feeds/videos.xml?channel_id=UCVHFbw7woebKtRljqyntYDQ",
@@ -69,8 +126,10 @@ def _fetch_youtube_trends(niche: str, limit: int = 8) -> list[str]:
                 title_el = entry.find("atom:title", ns)
                 if title_el is not None and title_el.text:
                     title = title_el.text.strip()
-                    if len(title) > 8:
+                    if len(title) > 8 and not _is_promotional(title):
                         titles.append(title)
+                    elif title and _is_promotional(title):
+                        logger.debug(f"YouTube: skipped promotional title: {title!r}")
 
             if titles:
                 logger.info(
@@ -101,8 +160,10 @@ def _fetch_hackernews_trends(niche: str, limit: int = 8) -> list[str]:
         hits = response.json().get("hits", [])
         for hit in hits[:limit]:
             title = (hit.get("title") or "").strip()
-            if title and len(title) > 8:
+            if title and len(title) > 8 and not _is_promotional(title):
                 titles.append(title)
+            elif title and _is_promotional(title):
+                logger.debug(f"HackerNews: skipped promotional story: {title!r}")
 
         logger.info(f"HackerNews: {len(titles)} stories for '{niche}'")
 

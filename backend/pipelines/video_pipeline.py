@@ -1,4 +1,5 @@
 import uuid
+import random
 from collections.abc import Callable
 from services.trend_service import collect_trends
 from services.niche_filter_service import filter_trends_for_niche
@@ -19,11 +20,13 @@ def run_pipeline(
     platforms: list[str],
     upload_config: dict,
     on_progress: Callable | None = None,
+    topic_pool: list[str] | None = None,
 ) -> dict:
     job_id = str(uuid.uuid4())[:8]
     result: dict = {
         "job_id": job_id,
         "niche": niche,
+        "topic": None,
         "status": "started",
         "step": "",
         "detail": "",
@@ -48,23 +51,31 @@ def run_pipeline(
     try:
         job_dirs = create_job_dirs(job_id)
 
-        # Step 1: Collect trends
-        progress("collecting_trends", niche)
-        trends = collect_trends(niche)
-        if not trends:
-            raise PipelineError(
-                "No trends collected. Check your network connection. "
-                "Google News RSS, YouTube RSS, and HackerNews should all work without credentials."
-            )
+        # Step 1: Collect trends (skip if a pre-built pool was provided by the queue)
+        if topic_pool:
+            filtered = list(topic_pool)
+            progress("using_topic_pool", f"{len(filtered)} topics available")
+        else:
+            progress("collecting_trends", niche)
+            trends = collect_trends(niche)
+            if not trends:
+                raise PipelineError(
+                    "No trends collected. Check your network connection. "
+                    "Google News RSS, YouTube RSS, and HackerNews should all work without credentials."
+                )
 
-        # Step 2: Filter trends for niche
-        progress("filtering_trends", f"{len(trends)} raw trends")
-        filtered = filter_trends_for_niche(trends, niche)
-        if not filtered:
-            raise PipelineError("Trend filtering returned no results.")
+            # Step 2: Filter trends for niche
+            progress("filtering_trends", f"{len(trends)} raw trends")
+            filtered = filter_trends_for_niche(trends, niche)
+            if not filtered:
+                raise PipelineError("Trend filtering returned no results.")
 
-        topic = filtered[0]
-        logger.info(f"[{job_id}] Selected topic: '{topic}'")
+        # Pick a random topic from the filtered list
+        topic = random.choice(filtered)
+        result["topic"] = topic
+        logger.info(
+            f"[{job_id}] Randomly selected topic: '{topic}' (pool size: {len(filtered)})"
+        )
 
         # Step 3: Generate script
         progress("generating_script", topic)
@@ -164,10 +175,55 @@ def run_queue(
     total = len(jobs)
     logger.info(f"Queue started: {total} job(s)")
 
+    # Group jobs by niche so we can build one shared topic pool per niche.
+    # This avoids fetching trends repeatedly and ensures each job in the same
+    # niche gets a *different* randomly-selected topic.
+    niche_pools: dict[str, list[str]] = {}
+
+    for job in jobs:
+        niche = job.get("niche", "Technology")
+        if niche not in niche_pools:
+            logger.info(f"Queue: collecting & filtering trends for niche '{niche}'")
+            try:
+                trends = collect_trends(niche)
+                filtered = filter_trends_for_niche(trends, niche) if trends else []
+            except Exception as e:
+                logger.warning(f"Queue: trend collection failed for '{niche}': {e}")
+                filtered = []
+
+            if filtered:
+                random.shuffle(filtered)
+                logger.info(
+                    f"Queue: topic pool for '{niche}' has {len(filtered)} topics (shuffled)"
+                )
+            else:
+                logger.warning(
+                    f"Queue: no topics found for '{niche}' — each job will collect its own trends"
+                )
+            niche_pools[niche] = filtered
+
+    # Maintain a per-niche iterator so consecutive jobs in the same niche
+    # cycle through the shuffled pool without repeating until exhausted.
+    niche_iterators: dict[str, list[str]] = {
+        niche: list(pool) for niche, pool in niche_pools.items()
+    }
+
     for index, job in enumerate(jobs):
         niche = job.get("niche", "Technology")
         platforms = job.get("platforms", [])
         upload_config = job.get("upload_config", {})
+
+        # Pop the next unique topic from the pool; if exhausted, reshuffle and reuse.
+        pool = niche_iterators.get(niche, [])
+        if not pool:
+            # Refill from the original pool (reshuffled) if we run out
+            refill = list(niche_pools.get(niche, []))
+            random.shuffle(refill)
+            niche_iterators[niche] = refill
+            pool = niche_iterators[niche]
+
+        # Pass the remaining pool to run_pipeline; it will pick randomly from it.
+        topic_pool = pool if pool else None
 
         logger.info(f"Queue: starting job {index + 1}/{total} — niche={niche}")
 
@@ -176,7 +232,14 @@ def run_queue(
             platforms=platforms,
             upload_config=upload_config,
             on_progress=on_progress,
+            topic_pool=topic_pool,
         )
+
+        # Remove the topic that was actually used so the next job won't repeat it
+        used_topic = result.get("topic")
+        if used_topic and used_topic in pool:
+            pool.remove(used_topic)
+
         results.append(result)
 
         if on_job_complete:

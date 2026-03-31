@@ -6,7 +6,7 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-MAX_WORDS_PER_SEGMENT = 8
+MAX_WORDS_PER_SEGMENT = 6
 
 
 def generate_subtitles(

@@ -18,12 +18,22 @@ def filter_trends_for_niche(trends: list[str], niche: str) -> list[str]:
         {
             "role": "user",
             "content": (
-                f"You are a content strategist specializing in short-form video.\n\n"
+                f"You are a content strategist specializing in short-form viral video.\n\n"
                 f"Given these trending topics:\n{trends_text}\n\n"
                 f"Your task:\n"
-                f"1. Select or adapt the 3 most compelling ideas for the niche: '{niche}'\n"
-                f"2. Each idea must be specific enough to write a 30-60 second video script about\n"
-                f"3. Adapt general trends to fit the niche if needed\n\n"
+                f"1. Select or adapt the 3 most compelling, attention-grabbing ideas for the niche: '{niche}'\n"
+                f"2. Each idea must be a genuine news event, discovery, fact, or interesting story — "
+                f"something that would make a viewer stop scrolling\n"
+                f"3. Each idea must be specific enough to write a 30-60 second video script about\n"
+                f"4. Adapt general trends to fit the niche if needed\n\n"
+                f"STRICT RULES — you MUST follow these:\n"
+                f"- REJECT any topic that is an advertisement, promotion, sponsored content, "
+                f"product sale, course, webinar, affiliate offer, or anything trying to sell something\n"
+                f"- REJECT vague clickbait with no real substance\n"
+                f"- ONLY pick real events, breaking news, scientific discoveries, historical facts, "
+                f"surprising statistics, or genuinely interesting stories\n"
+                f"- If no suitable topic exists in the list, create a compelling topic idea "
+                f"relevant to the niche '{niche}' based on current trends\n\n"
                 f"Return ONLY a valid JSON array of exactly 3 short topic strings. "
                 f"No explanation, no markdown, no extra text.\n"
                 f'Example: ["Topic one", "Topic two", "Topic three"]'

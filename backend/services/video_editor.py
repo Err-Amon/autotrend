@@ -67,8 +67,9 @@ def assemble_video(
             escaped = _escape_subtitle_path(subtitle_path)
             vf_filter += (
                 f",subtitles='{escaped}'"
-                f":force_style='FontSize=16,PrimaryColour=&Hffffff,"
-                f"OutlineColour=&H000000,Outline=2,Alignment=2,MarginV=20'"
+                f":force_style='FontSize=24,PrimaryColour=&Hffffff,"
+                f"OutlineColour=&H000000,Outline=2,BackColour=&H80000000,BorderStyle=1,"
+                f"Alignment=2,MarginV=30,FontName=Arial,Bold=1'"
             )
 
         cmd = [
