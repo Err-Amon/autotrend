@@ -5,13 +5,11 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-FFMPEG_PRESET = "ultrafast"  # Lowest CPU usage during encoding
-FFMPEG_CRF = "30"  # Slightly lower quality but much less memory
-FFMPEG_THREADS = "2"  # Cap at 2 threads — prevents CPU saturation
-FFMPEG_TIMEOUT = 180  # 3 minute hard limit per FFmpeg call
+FFMPEG_PRESET = "ultrafast"
+FFMPEG_CRF = "30"
+FFMPEG_THREADS = "2"
+FFMPEG_TIMEOUT = 180
 
-# Process at lower resolution internally, final output is still 1080x1920
-# but clips are scaled down before concat to reduce memory footprint
 PROCESS_WIDTH = 540
 PROCESS_HEIGHT = 960
 
@@ -36,9 +34,9 @@ def assemble_video(
 
     concat_file = os.path.join(out_dir, "concat.txt")
     output_path = os.path.join(out_dir, "final.mp4")
+    scaled_clips: list[str] = []
 
     try:
-        # Validate clips
         valid_clips = [c for c in clips if os.path.exists(c) and os.path.getsize(c) > 0]
         if not valid_clips:
             logger.error(f"[{job_id}] No valid clip files found")
@@ -46,11 +44,9 @@ def assemble_video(
 
         logger.info(f"[{job_id}] Assembling {len(valid_clips)} clips")
 
-        scaled_clips = []
         for i, clip in enumerate(valid_clips):
             scaled = os.path.join(out_dir, f"scaled_{i}.mp4")
-            success = _scale_clip(clip, scaled, job_id, i)
-            if success:
+            if _scale_clip(clip, scaled, job_id, i):
                 scaled_clips.append(scaled)
 
         if not scaled_clips:
@@ -100,15 +96,13 @@ def assemble_video(
             FFMPEG_PRESET,
             "-crf",
             FFMPEG_CRF,
-            "-threads",
-            FFMPEG_THREADS,
             "-c:a",
             "aac",
             "-b:a",
             "96k",
             "-shortest",
             "-movflags",
-            "+faststart",  # Web-optimised MP4
+            "+faststart",
             output_path,
         ]
 
@@ -129,10 +123,7 @@ def assemble_video(
         logger.error(f"[{job_id}] Video assembly failed: {e}")
         return None
     finally:
-        # Clean up scaled intermediates and concat file
-        _cleanup([concat_file])
-        for i in range(len(valid_clips) if "valid_clips" in dir() else 0):
-            _cleanup([os.path.join(out_dir, f"scaled_{i}.mp4")])
+        _cleanup([concat_file] + scaled_clips)
 
 
 def _scale_clip(input_path: str, output_path: str, job_id: str, index: int) -> bool:
@@ -156,8 +147,6 @@ def _scale_clip(input_path: str, output_path: str, job_id: str, index: int) -> b
         FFMPEG_PRESET,
         "-crf",
         FFMPEG_CRF,
-        "-threads",
-        FFMPEG_THREADS,
         "-an",
         output_path,
     ]
@@ -173,7 +162,6 @@ def get_audio_duration(audio_path: str) -> float:
     if not os.path.exists(audio_path):
         logger.warning(f"Audio file not found: {audio_path}, defaulting to 30s")
         return 30.0
-
     try:
         result = subprocess.run(
             [
@@ -200,24 +188,34 @@ def get_audio_duration(audio_path: str) -> float:
 
 def _run_ffmpeg(cmd: list[str], job_id: str, step: str = ""):
     logger.info(f"[{job_id}] FFmpeg [{step}] starting")
+
     try:
         process = subprocess.Popen(
             cmd,
-            stdout=subprocess.DEVNULL,  # Discard stdout entirely
-            stderr=subprocess.PIPE,  # Stream stderr — not buffer it
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.PIPE,
             text=True,
         )
 
-        # Read stderr line by line — no memory accumulation
-        stderr_tail = []
+        # Read stderr line by line — prevents pipe buffer deadlock
+        # and avoids loading entire stderr into RAM
+        stderr_tail: list[str] = []
         for line in process.stderr:
             line = line.rstrip()
             if line:
                 stderr_tail.append(line)
                 if len(stderr_tail) > 20:
-                    stderr_tail.pop(0)  # Keep only last 20 lines
+                    stderr_tail.pop(0)
 
-        process.wait(timeout=FFMPEG_TIMEOUT)
+        # stderr pipe is now drained — wait is safe, no deadlock possible
+        try:
+            process.wait(timeout=FFMPEG_TIMEOUT)
+        except subprocess.TimeoutExpired:
+            process.kill()
+            process.wait()
+            raise RuntimeError(
+                f"[{job_id}] FFmpeg [{step}] killed after {FFMPEG_TIMEOUT}s timeout"
+            )
 
         if process.returncode != 0:
             tail = "\n".join(stderr_tail)
@@ -227,11 +225,10 @@ def _run_ffmpeg(cmd: list[str], job_id: str, step: str = ""):
 
         logger.info(f"[{job_id}] FFmpeg [{step}] complete")
 
-    except subprocess.TimeoutExpired:
-        process.kill()
-        raise RuntimeError(
-            f"[{job_id}] FFmpeg [{step}] killed after {FFMPEG_TIMEOUT}s timeout"
-        )
+    except RuntimeError:
+        raise
+    except Exception as e:
+        raise RuntimeError(f"[{job_id}] FFmpeg [{step}] unexpected error: {e}")
 
 
 def _escape_subtitle_path(path: str) -> str:

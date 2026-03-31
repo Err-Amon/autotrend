@@ -19,7 +19,7 @@ def generate_metadata(script: str, niche: str) -> dict:
                 f"Return ONLY a valid JSON object with these exact keys:\n"
                 f"- title: string, max 80 characters, no emojis\n"
                 f"- description: string, max 200 characters\n"
-                f"- hashtags: array of exactly 10 strings, no # symbol, relevant to niche and topic\n\n"
+                f"- hashtags: array of exactly 10 strings, no # symbol\n\n"
                 f"No explanation. No markdown. Valid JSON only."
             ),
         }
@@ -31,20 +31,21 @@ def generate_metadata(script: str, niche: str) -> dict:
         try:
             cleaned = response.strip()
             if cleaned.startswith("```"):
-                cleaned = cleaned.split("```")[1]
+                parts = cleaned.split("```")
+                # parts[1] is the content between first pair of fences
+                cleaned = parts[1]
                 if cleaned.startswith("json"):
                     cleaned = cleaned[4:]
             cleaned = cleaned.strip()
 
             metadata = json.loads(cleaned)
 
-            # Validate and sanitize
             title = str(metadata.get("title", "")).strip()[:100]
             description = str(metadata.get("description", "")).strip()[:2000]
             hashtags = metadata.get("hashtags", [])
             if not isinstance(hashtags, list):
                 hashtags = []
-            hashtags = [str(h).replace("#", "").strip() for h in hashtags[:20]]
+            hashtags = [str(h).replace("#", "").strip() for h in hashtags[:20] if h]
 
             if title and description:
                 logger.info(f"Metadata generated: '{title}'")
@@ -53,11 +54,14 @@ def generate_metadata(script: str, niche: str) -> dict:
                     "description": description,
                     "hashtags": hashtags,
                 }
+            else:
+                logger.warning("Metadata missing title or description, using fallback")
 
-        except (json.JSONDecodeError, Exception) as e:
-            logger.warning(f"Could not parse metadata from Groq: {e}")
+        except json.JSONDecodeError as e:
+            logger.warning(f"Metadata JSON parse failed: {e}")
+        except (KeyError, TypeError, ValueError) as e:
+            logger.warning(f"Metadata structure invalid: {e}")
 
-    # Fallback metadata
     logger.warning("Using fallback metadata")
     return {
         "title": f"Amazing {niche} Facts You Never Knew",
@@ -92,20 +96,20 @@ def upload_to_platforms(
     title = metadata["title"]
     description = metadata["description"]
     hashtags = metadata["hashtags"]
-    results: dict[str, str | None] = {}
-
     caption = f"{title}\n\n{description}\n\n" + " ".join(f"#{h}" for h in hashtags)
+
+    results: dict[str, str | None] = {}
 
     if "youtube" in platforms:
         logger.info("Uploading to YouTube")
-        video_id = upload_to_youtube(video_path, title, description, hashtags)
-        results["youtube"] = video_id
+        results["youtube"] = upload_to_youtube(video_path, title, description, hashtags)
 
     if "facebook" in platforms:
         logger.info("Uploading to Facebook")
         page_id = upload_config.get("facebook_page_id", "")
-        video_id = upload_to_facebook(video_path, title, description, page_id)
-        results["facebook"] = video_id
+        results["facebook"] = upload_to_facebook(
+            video_path, title, description, page_id
+        )
 
     if "instagram" in platforms:
         logger.info("Uploading to Instagram")
@@ -113,13 +117,12 @@ def upload_to_platforms(
         video_url = upload_config.get("video_public_url", "")
         if not video_url:
             logger.warning(
-                "Instagram upload skipped: 'video_public_url' not provided in upload_config. "
+                "Instagram upload skipped: 'video_public_url' not in upload_config. "
                 "Instagram requires the video to be hosted at a public HTTPS URL."
             )
             results["instagram"] = None
         else:
-            media_id = upload_to_instagram(video_url, caption, ig_user_id)
-            results["instagram"] = media_id
+            results["instagram"] = upload_to_instagram(video_url, caption, ig_user_id)
 
     logger.info(f"Upload results: {results}")
     return results

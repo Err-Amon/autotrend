@@ -1,11 +1,11 @@
 import os
-import json
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
 TOKEN_FILE = "token.json"
+CLIENT_SECRETS_FILE = "client_secrets.json"
 
 
 def _get_credentials():
@@ -19,7 +19,7 @@ def _get_credentials():
         try:
             creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
         except Exception as e:
-            logger.warning(f"Could not load token.json: {e}")
+            logger.warning(f"Could not load {TOKEN_FILE}: {e}")
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -30,20 +30,20 @@ def _get_credentials():
                 creds = None
 
         if not creds:
-            # Requires client_secrets.json in project root
-            if not os.path.exists("client_secrets.json"):
+            if not os.path.exists(CLIENT_SECRETS_FILE):
                 raise FileNotFoundError(
-                    "client_secrets.json not found. "
-                    "Download it from Google Cloud Console and place it in the project root."
+                    f"{CLIENT_SECRETS_FILE} not found. "
+                    "Download it from Google Cloud Console (OAuth 2.0 Desktop App) "
+                    "and place it in the project root."
                 )
             flow = InstalledAppFlow.from_client_secrets_file(
-                "client_secrets.json", SCOPES
+                CLIENT_SECRETS_FILE, SCOPES
             )
             creds = flow.run_local_server(port=0)
 
         with open(TOKEN_FILE, "w") as f:
             f.write(creds.to_json())
-        logger.info("YouTube token saved to token.json")
+        logger.info(f"YouTube credentials saved to {TOKEN_FILE}")
 
     return creds
 
@@ -82,7 +82,7 @@ def upload_to_youtube(
             video_path,
             mimetype="video/mp4",
             resumable=True,
-            chunksize=1024 * 1024,  # 1MB chunks — memory efficient
+            chunksize=1024 * 1024,
         )
 
         request = youtube.videos().insert(

@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Callable
 from services.trend_service import collect_trends
 from services.niche_filter_service import filter_trends_for_niche
 from services.script_service import generate_script
@@ -17,43 +18,46 @@ def run_pipeline(
     niche: str,
     platforms: list[str],
     upload_config: dict,
-    on_progress: callable = None,
+    on_progress: Callable | None = None,
 ) -> dict:
     job_id = str(uuid.uuid4())[:8]
-    result = {
+    result: dict = {
         "job_id": job_id,
         "niche": niche,
         "status": "started",
         "step": "",
+        "detail": "",
         "error": None,
         "video_path": None,
         "uploads": {},
     }
 
-    job_dirs = None
+    job_dirs: dict | None = None
 
     def progress(step: str, detail: str = ""):
         result["step"] = step
+        result["detail"] = detail
         msg = f"[{job_id}] {step}" + (f": {detail}" if detail else "")
         logger.info(msg)
         if on_progress:
             try:
                 on_progress(job_id, step, detail)
-            except Exception as e:
-                logger.warning(f"Progress callback error: {e}")
+            except Exception as cb_err:
+                logger.warning(f"Progress callback error: {cb_err}")
 
     try:
-        # Create isolated directories for this job
         job_dirs = create_job_dirs(job_id)
 
+        # Step 1: Collect trends
         progress("collecting_trends", niche)
         trends = collect_trends(niche)
         if not trends:
             raise PipelineError(
-                "No trends collected. Check network connection — "
-                "Google Trends and Nitter should work without credentials."
+                "No trends collected. Check your network connection. "
+                "Google News RSS, YouTube RSS, and HackerNews should all work without credentials."
             )
 
+        # Step 2: Filter trends for niche
         progress("filtering_trends", f"{len(trends)} raw trends")
         filtered = filter_trends_for_niche(trends, niche)
         if not filtered:
@@ -62,26 +66,30 @@ def run_pipeline(
         topic = filtered[0]
         logger.info(f"[{job_id}] Selected topic: '{topic}'")
 
+        # Step 3: Generate script
         progress("generating_script", topic)
         script = generate_script(topic, niche, job_id, scripts_dir=job_dirs["scripts"])
         if not script:
             raise PipelineError(f"Script generation failed for topic: '{topic}'")
 
+        # Step 4: Generate voice narration
         progress("generating_voice")
         audio_path = generate_voice(script, job_id, audio_dir=job_dirs["audio"])
         if not audio_path:
             raise PipelineError(
                 "Voice generation failed. "
-                "Ensure Piper TTS is installed and model file exists at PIPER_MODEL_PATH."
+                "Ensure Piper TTS is installed and PIPER_MODEL_PATH points to the .onnx file."
             )
 
+        # Step 5: Fetch stock video clips
         progress("fetching_clips", topic)
         clips = fetch_clips_for_script(script, job_dirs["clips"], job_id)
         if not clips:
             raise PipelineError(
-                "No video clips fetched. Check PEXELS_API_KEY and PIXABAY_API_KEY."
+                "No video clips fetched. Check PEXELS_API_KEY and PIXABAY_API_KEY in .env."
             )
 
+        # Step 6: Generate subtitles
         progress("generating_subtitles")
         audio_duration = get_audio_duration(audio_path)
         subtitle_path = generate_subtitles(
@@ -93,6 +101,7 @@ def run_pipeline(
         if not subtitle_path:
             logger.warning(f"[{job_id}] Subtitles failed — continuing without them")
 
+        # Step 7: Assemble final video
         progress("assembling_video")
         video_path = assemble_video(
             clips,
@@ -103,15 +112,14 @@ def run_pipeline(
         )
         if not video_path:
             raise PipelineError(
-                "Video assembly failed. Check FFmpeg is installed: ffmpeg -version"
+                "Video assembly failed. Verify FFmpeg is installed: run 'ffmpeg -version' in terminal."
             )
 
         result["video_path"] = video_path
         result["status"] = "assembled"
-
-        # Clean up workspace — audio, clips, subtitles no longer needed
         clean_job_workspace(job_id)
 
+        # Step 8: Upload to platforms
         if platforms:
             progress("uploading", ", ".join(platforms))
             uploads = upload_to_platforms(
@@ -145,8 +153,8 @@ def run_pipeline(
 
 def run_queue(
     jobs: list[dict],
-    on_progress: callable = None,
-    on_job_complete: callable = None,
+    on_progress: Callable | None = None,
+    on_job_complete: Callable | None = None,
 ) -> list[dict]:
     if not jobs:
         logger.warning("Queue received with no jobs")
@@ -169,7 +177,6 @@ def run_queue(
             upload_config=upload_config,
             on_progress=on_progress,
         )
-
         results.append(result)
 
         if on_job_complete:
@@ -186,7 +193,6 @@ def run_queue(
     completed = sum(1 for r in results if r["status"] == "complete")
     failed = sum(1 for r in results if r["status"] == "failed")
     logger.info(f"Queue done — {completed} succeeded, {failed} failed out of {total}")
-
     return results
 
 
