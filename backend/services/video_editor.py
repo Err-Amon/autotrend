@@ -178,7 +178,12 @@ def get_audio_duration(audio_path: str) -> float:
             text=True,
             timeout=15,
         )
-        duration = float(result.stdout.strip())
+        if result.returncode != 0:
+            raise RuntimeError(f"ffprobe failed: {result.stderr}")
+        duration_str = result.stdout.strip()
+        if not duration_str:
+            raise RuntimeError("ffprobe returned empty duration")
+        duration = float(duration_str)
         logger.info(f"Audio duration: {duration:.2f}s")
         return duration
     except Exception as e:

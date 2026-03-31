@@ -22,4 +22,5 @@ dependencies = [
     "google-auth-httplib2>=0.2.0",
     "google-api-python-client>=2.127.0",
     "nltk>=3.8.1",
+    "google-cloud-texttospeech>=2.35.0",
 ]

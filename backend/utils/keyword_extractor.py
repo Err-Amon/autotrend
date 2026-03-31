@@ -1,4 +1,5 @@
 import re
+from integrations.groq_client import groq_chat
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -133,5 +134,64 @@ def extract_keywords(text: str, max_keywords: int = 5) -> list[str]:
         return []
 
 
+def extract_keywords_with_groq(script: str, max_keywords: int = 5) -> list[str]:
+    if not script:
+        return []
+
+    try:
+        messages = [
+            {
+                "role": "user",
+                "content": (
+                    f"Extract {max_keywords} key visual keywords from this video script for stock video search. "
+                    f"Focus on nouns, objects, scenes, actions that can be depicted in videos. "
+                    f"Keywords should be relevant to finding matching video clips. "
+                    f"Output only comma-separated keywords, no explanations or extra text.\n\nScript: {script}"
+                ),
+            }
+        ]
+        response = groq_chat(messages, max_tokens=100)
+        if response:
+            keywords = [k.strip().lower() for k in response.split(",") if k.strip()]
+            keywords = keywords[:max_keywords]
+            logger.info(f"Groq extracted keywords: {keywords}")
+            return keywords
+        else:
+            logger.warning("Groq keyword extraction returned empty, falling back")
+            return extract_keywords(script, max_keywords)
+    except Exception as e:
+        logger.error(f"Groq keyword extraction failed: {e}, falling back")
+        return extract_keywords(script, max_keywords)
+
+
 def keywords_to_query(keywords: list[str], max_words: int = 3) -> str:
     return " ".join(keywords[:max_words])
+
+
+def get_visual_description(segment: str) -> str:
+    if not segment:
+        return "nature"
+
+    try:
+        messages = [
+            {
+                "role": "user",
+                "content": (
+                    f"Describe a visual scene that matches this script segment for stock video search. "
+                    f"Provide a short phrase (1-5 words) describing what should be shown in the video. "
+                    f"Focus on visual elements like objects, actions, or settings. "
+                    f"Output only the description phrase, no extra text.\n\nSegment: {segment}"
+                ),
+            }
+        ]
+        response = groq_chat(messages, max_tokens=50)
+        if response:
+            description = response.strip()
+            logger.info(f"Visual description: '{description}' for segment: '{segment}'")
+            return description
+        else:
+            logger.warning("Groq visual description returned empty, using segment")
+            return segment[:50]  # fallback
+    except Exception as e:
+        logger.error(f"Groq visual description failed: {e}, using segment")
+        return segment[:50]

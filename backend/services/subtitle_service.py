@@ -33,15 +33,36 @@ def generate_subtitles(
         os.makedirs(save_dir, exist_ok=True)
         srt_path = os.path.join(save_dir, "subtitles.srt")
 
-        duration_per_segment = audio_duration / len(segments)
-
-        with open(srt_path, "w", encoding="utf-8") as f:
-            for i, segment in enumerate(segments):
-                start = i * duration_per_segment
-                end = start + duration_per_segment
-                f.write(f"{i + 1}\n")
-                f.write(f"{_format_time(start)} --> {_format_time(end)}\n")
-                f.write(f"{segment}\n\n")
+        total_words = sum(wc for _, wc in segments)
+        if total_words == 0:
+            logger.warning(
+                f"[{job_id}] No words in segments, falling back to equal timing"
+            )
+            duration_per_segment = audio_duration / len(segments)
+            cumulative_time = 0.0
+            with open(srt_path, "w", encoding="utf-8") as f:
+                for i, (segment, _) in enumerate(segments):
+                    start = cumulative_time
+                    end = start + duration_per_segment
+                    if i == len(segments) - 1:
+                        end = audio_duration
+                    f.write(f"{i + 1}\n")
+                    f.write(f"{_format_time(start)} --> {_format_time(end)}\n")
+                    f.write(f"{segment}\n\n")
+                    cumulative_time = end
+        else:
+            cumulative_time = 0.0
+            with open(srt_path, "w", encoding="utf-8") as f:
+                for i, (segment, wc) in enumerate(segments):
+                    time_allocated = (wc / total_words) * audio_duration
+                    start = cumulative_time
+                    end = start + time_allocated
+                    if i == len(segments) - 1:
+                        end = audio_duration
+                    f.write(f"{i + 1}\n")
+                    f.write(f"{_format_time(start)} --> {_format_time(end)}\n")
+                    f.write(f"{segment}\n\n")
+                    cumulative_time = end
 
         logger.info(
             f"[{job_id}] Subtitles saved: {srt_path} ({len(segments)} segments)"
@@ -53,7 +74,7 @@ def generate_subtitles(
         return None
 
 
-def _split_into_segments(text: str) -> list[str]:
+def _split_into_segments(text: str) -> list[tuple[str, int]]:
     sentences = re.split(r"(?<=[.!?])\s+", text.strip())
     segments = []
     for sentence in sentences:
@@ -64,9 +85,9 @@ def _split_into_segments(text: str) -> list[str]:
         if len(words) > MAX_WORDS_PER_SEGMENT:
             for i in range(0, len(words), MAX_WORDS_PER_SEGMENT):
                 chunk = " ".join(words[i : i + MAX_WORDS_PER_SEGMENT])
-                segments.append(chunk)
+                segments.append((chunk, len(chunk.split())))
         else:
-            segments.append(sentence)
+            segments.append((sentence, len(words)))
     return segments
 
 

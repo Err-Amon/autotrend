@@ -20,17 +20,20 @@ def generate_script(
         {
             "role": "user",
             "content": (
-                f"Write a short-form vertical video script (YouTube Shorts / Instagram Reels style).\n\n"
+                f"Write a short-form vertical video script (YouTube Shorts / Instagram Reels style) that feels fresh, "
+                f"original, and scroll-stopping every time.\n\n"
                 f"Topic: {topic}\n"
                 f"Niche: {niche}\n\n"
                 f"Strict rules:\n"
-                f"- First sentence must be a powerful hook that stops the scroll\n"
+                f"- Begin with a hook that grabs attention in 3 seconds\n"
                 f"- Use short, punchy sentences of max 10 words each\n"
-                f"- Write narration text ONLY — no stage directions, no scene labels, no [brackets]\n"
-                f"- End with a clear call to action (follow, like, share)\n"
+                f"- Keep narration text ONLY — no stage directions, no scene labels, no [brackets]\n"
+                f"- Include natural rhythm and pacing to engage viewers\n"
+                f"- Use vivid, relatable examples or metaphors when possible\n"
                 f"- Total length: 80 to 120 words\n"
-                f"- Tone: engaging, confident, fast-paced\n\n"
-                f"Output the script text only. Nothing else."
+                f"- Tone: engaging, confident, fast-paced, and energetic\n"
+                f"- Add subtle variation in phrasing each time to make scripts unique\n\n"
+                f"Output ONLY the script text — nothing else, no explanations, no extra formatting."
             ),
         }
     ]
