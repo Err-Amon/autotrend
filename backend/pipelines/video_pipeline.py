@@ -7,23 +7,10 @@ from services.video_fetcher import fetch_clips_for_script
 from services.video_editor import assemble_video, get_audio_duration
 from services.subtitle_service import generate_subtitles
 from services.uploader_service import upload_to_platforms
-from utils.file_manager import ensure_storage_dirs, clean_job_files
+from utils.file_manager import create_job_dirs, clean_job_workspace, clean_job_final
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
-
-# Pipeline step labels — used for progress callbacks and logging
-STEPS = [
-    "collecting_trends",
-    "filtering_trends",
-    "generating_script",
-    "generating_voice",
-    "fetching_clips",
-    "generating_subtitles",
-    "assembling_video",
-    "uploading",
-    "complete",
-]
 
 
 def run_pipeline(
@@ -43,6 +30,8 @@ def run_pipeline(
         "uploads": {},
     }
 
+    job_dirs = None
+
     def progress(step: str, detail: str = ""):
         result["step"] = step
         msg = f"[{job_id}] {step}" + (f": {detail}" if detail else "")
@@ -54,13 +43,15 @@ def run_pipeline(
                 logger.warning(f"Progress callback error: {e}")
 
     try:
-        ensure_storage_dirs()
+        # Create isolated directories for this job
+        job_dirs = create_job_dirs(job_id)
 
         progress("collecting_trends", niche)
         trends = collect_trends(niche)
         if not trends:
             raise PipelineError(
-                "No trends could be collected. Check API credentials and network."
+                "No trends collected. Check network connection — "
+                "Google Trends and Nitter should work without credentials."
             )
 
         progress("filtering_trends", f"{len(trends)} raw trends")
@@ -72,38 +63,54 @@ def run_pipeline(
         logger.info(f"[{job_id}] Selected topic: '{topic}'")
 
         progress("generating_script", topic)
-        script = generate_script(topic, niche, job_id)
+        script = generate_script(topic, niche, job_id, scripts_dir=job_dirs["scripts"])
         if not script:
             raise PipelineError(f"Script generation failed for topic: '{topic}'")
 
         progress("generating_voice")
-        audio_path = generate_voice(script, job_id)
+        audio_path = generate_voice(script, job_id, audio_dir=job_dirs["audio"])
         if not audio_path:
             raise PipelineError(
-                "Voice generation failed. Ensure Piper TTS is installed and the model file exists."
+                "Voice generation failed. "
+                "Ensure Piper TTS is installed and model file exists at PIPER_MODEL_PATH."
             )
 
         progress("fetching_clips", topic)
-        clips = fetch_clips_for_script(script, job_id)
+        clips = fetch_clips_for_script(script, job_dirs["clips"], job_id)
         if not clips:
             raise PipelineError(
-                "No video clips could be fetched. Check PEXELS_API_KEY and PIXABAY_API_KEY."
+                "No video clips fetched. Check PEXELS_API_KEY and PIXABAY_API_KEY."
             )
 
         progress("generating_subtitles")
         audio_duration = get_audio_duration(audio_path)
-        subtitle_path = generate_subtitles(script, audio_duration, job_id)
+        subtitle_path = generate_subtitles(
+            script,
+            audio_duration,
+            job_id,
+            subtitles_dir=job_dirs["subtitles"],
+        )
         if not subtitle_path:
             logger.warning(f"[{job_id}] Subtitles failed — continuing without them")
 
         progress("assembling_video")
-        video_path = assemble_video(clips, audio_path, subtitle_path, job_id)
+        video_path = assemble_video(
+            clips,
+            audio_path,
+            subtitle_path,
+            job_id,
+            output_dir=job_dirs["final"],
+        )
         if not video_path:
-            raise PipelineError("Video assembly failed. Check FFmpeg installation.")
+            raise PipelineError(
+                "Video assembly failed. Check FFmpeg is installed: ffmpeg -version"
+            )
 
         result["video_path"] = video_path
         result["status"] = "assembled"
-        logger.info(f"[{job_id}] Video assembled: {video_path}")
+
+        # Clean up workspace — audio, clips, subtitles no longer needed
+        clean_job_workspace(job_id)
 
         if platforms:
             progress("uploading", ", ".join(platforms))
@@ -113,6 +120,7 @@ def run_pipeline(
             result["uploads"] = uploads
         else:
             logger.info(f"[{job_id}] No platforms selected, skipping upload")
+
         result["status"] = "complete"
         progress("complete", video_path)
 
@@ -120,18 +128,17 @@ def run_pipeline(
         logger.error(f"[{job_id}] Pipeline error: {e}")
         result["status"] = "failed"
         result["error"] = str(e)
+        if job_dirs:
+            clean_job_workspace(job_id)
+            clean_job_final(job_id)
 
     except Exception as e:
-        logger.error(f"[{job_id}] Unexpected pipeline failure: {e}", exc_info=True)
+        logger.error(f"[{job_id}] Unexpected failure: {e}", exc_info=True)
         result["status"] = "failed"
         result["error"] = f"Unexpected error: {e}"
-
-    finally:
-        # Always clean up temp files regardless of outcome
-        try:
-            clean_job_files(job_id)
-        except Exception as e:
-            logger.warning(f"[{job_id}] Cleanup failed: {e}")
+        if job_dirs:
+            clean_job_workspace(job_id)
+            clean_job_final(job_id)
 
     return result
 
@@ -171,17 +178,14 @@ def run_queue(
             except Exception as e:
                 logger.warning(f"on_job_complete callback error: {e}")
 
-        status = result.get("status")
         logger.info(
-            f"Queue: job {index + 1}/{total} finished "
-            f"(status={status}, job_id={result.get('job_id')})"
+            f"Queue: job {index + 1}/{total} done "
+            f"(status={result.get('status')}, id={result.get('job_id')})"
         )
 
     completed = sum(1 for r in results if r["status"] == "complete")
     failed = sum(1 for r in results if r["status"] == "failed")
-    logger.info(
-        f"Queue complete — {completed} succeeded, {failed} failed out of {total}"
-    )
+    logger.info(f"Queue done — {completed} succeeded, {failed} failed out of {total}")
 
     return results
 

@@ -1,6 +1,6 @@
 import os
 import requests
-from config import PIXABAY_API_KEY, CLIPS_DIR
+from config import PIXABAY_API_KEY
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -9,7 +9,9 @@ PIXABAY_URL = "https://pixabay.com/api/videos/"
 CHUNK_SIZE = 8192
 
 
-def fetch_pixabay_clips(query: str, job_id: str, count: int = 3) -> list[str]:
+def fetch_pixabay_clips(
+    query: str, clips_dir: str, job_id: str, count: int = 3
+) -> list[str]:
     if not PIXABAY_API_KEY:
         logger.error("PIXABAY_API_KEY is not set")
         return []
@@ -35,8 +37,8 @@ def fetch_pixabay_clips(query: str, job_id: str, count: int = 3) -> list[str]:
 
         for i, hit in enumerate(hits[:count]):
             videos = hit.get("videos", {})
-            # Prefer medium quality to save disk and memory
-            clip = videos.get("medium") or videos.get("small") or videos.get("large")
+            # Prefer small over medium to reduce memory pressure
+            clip = videos.get("small") or videos.get("medium") or videos.get("large")
             if not clip:
                 continue
 
@@ -44,21 +46,18 @@ def fetch_pixabay_clips(query: str, job_id: str, count: int = 3) -> list[str]:
             if not url:
                 continue
 
-            path = os.path.join(CLIPS_DIR, f"{job_id}_pixabay_{i}.mp4")
-            success = _stream_download(url, path)
-            if success:
+            path = os.path.join(clips_dir, f"pixabay_{i}.mp4")
+            if _stream_download(url, path):
                 paths.append(path)
 
     except requests.exceptions.Timeout:
         logger.error("Pixabay API request timed out")
     except requests.exceptions.HTTPError as e:
-        logger.error(
-            f"Pixabay API HTTP error {e.response.status_code}: {e.response.text}"
-        )
+        logger.error(f"Pixabay HTTP error {e.response.status_code}: {e.response.text}")
     except Exception as e:
         logger.error(f"Pixabay fetch failed: {e}")
 
-    logger.info(f"Pixabay: downloaded {len(paths)} clips for query '{query}'")
+    logger.info(f"Pixabay: downloaded {len(paths)} clips for '{query}'")
     return paths
 
 
@@ -72,7 +71,7 @@ def _stream_download(url: str, path: str) -> bool:
                         f.write(chunk)
         return True
     except Exception as e:
-        logger.error(f"Failed to download clip from {url}: {e}")
+        logger.error(f"Failed to download clip: {e}")
         if os.path.exists(path):
             os.remove(path)
         return False

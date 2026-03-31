@@ -6,7 +6,12 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 
-def generate_script(topic: str, niche: str, job_id: str) -> str | None:
+def generate_script(
+    topic: str,
+    niche: str,
+    job_id: str,
+    scripts_dir: str = "",
+) -> str | None:
     if not topic or not niche:
         logger.error("Topic and niche are required for script generation")
         return None
@@ -33,24 +38,24 @@ def generate_script(topic: str, niche: str, job_id: str) -> str | None:
     script = groq_chat(messages, max_tokens=350)
 
     if not script:
-        logger.error(f"Script generation returned empty for job {job_id}")
+        logger.error(f"[{job_id}] Script generation returned empty")
         return None
 
     script = script.strip()
-
-    # Basic validation
     word_count = len(script.split())
     if word_count < 30:
-        logger.warning(f"Script seems too short ({word_count} words) for job {job_id}")
+        logger.warning(f"[{job_id}] Script is short ({word_count} words)")
 
-    # Save to disk
-    os.makedirs(SCRIPTS_DIR, exist_ok=True)
-    script_path = os.path.join(SCRIPTS_DIR, f"{job_id}_script.txt")
+    # Save to per-job scripts directory
+    save_dir = scripts_dir or SCRIPTS_DIR
+    os.makedirs(save_dir, exist_ok=True)
+    script_path = os.path.join(save_dir, "script.txt")
+
     try:
         with open(script_path, "w", encoding="utf-8") as f:
             f.write(script)
-        logger.info(f"Script saved: {script_path} ({word_count} words)")
+        logger.info(f"[{job_id}] Script saved: {script_path} ({word_count} words)")
     except Exception as e:
-        logger.warning(f"Could not save script to disk: {e}")
+        logger.warning(f"[{job_id}] Could not save script: {e}")
 
     return script

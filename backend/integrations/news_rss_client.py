@@ -4,12 +4,10 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Google News RSS — free, no API key, no approval, updated continuously
 GOOGLE_NEWS_RSS = (
     "https://news.google.com/rss/search?q={query}&hl=en-US&gl=US&ceid=US:en"
 )
 
-# Fallback general news RSS feeds per niche (BBC, Reuters — always available)
 NICHE_RSS_FEEDS: dict[str, list[str]] = {
     "Islamic History": [
         "https://news.google.com/rss/search?q=islamic+history+muslim&hl=en-US&gl=US&ceid=US:en",
