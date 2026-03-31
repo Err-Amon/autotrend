@@ -65,11 +65,38 @@ def assemble_video(
 
         if subtitle_path and os.path.exists(subtitle_path):
             escaped = _escape_subtitle_path(subtitle_path)
+            # ── Subtitle style: clean, modern, mobile-friendly ─────────────
+            # FontName=DejaVu Sans — crisp, open-source, always on Linux;
+            #                        much more readable than Arial at small sizes
+            # FontSize=28          — proportionate for 1080×1920 portrait video
+            # Bold=1               — bold weight for impact
+            # PrimaryColour        — warm white (slightly off-white) text
+            # OutlineColour        — pure black outline for contrast on any bg
+            # Outline=2            — solid outline so text pops on busy clips
+            # Shadow=1             — subtle drop-shadow for depth
+            # ShadowColour         — semi-transparent black shadow
+            # BackColour           — transparent (no opaque box)
+            # BorderStyle=1        — outline+shadow mode (no box)
+            # Alignment=2          — bottom-centre (standard subtitle position)
+            # MarginV=55           — comfortable distance from the bottom edge
+            # MarginL/R=35         — side margins so text never clips the edge
             vf_filter += (
                 f",subtitles='{escaped}'"
-                f":force_style='FontSize=24,PrimaryColour=&Hffffff,"
-                f"OutlineColour=&H000000,Outline=2,BackColour=&H80000000,BorderStyle=1,"
-                f"Alignment=2,MarginV=30,FontName=Arial,Bold=1'"
+                f":force_style='"
+                f"FontName=DejaVu Sans,"
+                f"FontSize=28,"
+                f"Bold=1,"
+                f"PrimaryColour=&H00F5F5F5,"
+                f"OutlineColour=&H00000000,"
+                f"Outline=2,"
+                f"Shadow=1,"
+                f"ShadowColour=&HA0000000,"
+                f"BackColour=&H00000000,"
+                f"BorderStyle=1,"
+                f"Alignment=2,"
+                f"MarginV=55,"
+                f"MarginL=35,"
+                f"MarginR=35'"
             )
 
         cmd = [

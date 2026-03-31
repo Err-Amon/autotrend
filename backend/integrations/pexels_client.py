@@ -10,7 +10,11 @@ CHUNK_SIZE = 8192
 
 
 def fetch_pexels_clips(
-    query: str, clips_dir: str, job_id: str, count: int = 3
+    query: str,
+    clips_dir: str,
+    job_id: str,
+    count: int = 3,
+    file_prefix: str = "pexels",
 ) -> list[str]:
     if not PEXELS_API_KEY:
         logger.error("PEXELS_API_KEY is not set")
@@ -54,7 +58,7 @@ def fetch_pexels_clips(
             if not url:
                 continue
 
-            path = os.path.join(clips_dir, f"pexels_{i}.mp4")
+            path = os.path.join(clips_dir, f"{file_prefix}_{i}.mp4")
             if _stream_download(url, path):
                 paths.append(path)
 

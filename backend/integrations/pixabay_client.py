@@ -10,8 +10,13 @@ CHUNK_SIZE = 8192
 
 
 def fetch_pixabay_clips(
-    query: str, clips_dir: str, job_id: str, count: int = 3
+    query: str,
+    clips_dir: str,
+    job_id: str,
+    count: int = 3,
+    file_prefix: str = "pixabay",
 ) -> list[str]:
+
     if not PIXABAY_API_KEY:
         logger.error("PIXABAY_API_KEY is not set")
         return []
@@ -46,7 +51,7 @@ def fetch_pixabay_clips(
             if not url:
                 continue
 
-            path = os.path.join(clips_dir, f"pixabay_{i}.mp4")
+            path = os.path.join(clips_dir, f"{file_prefix}_{i}.mp4")
             if _stream_download(url, path):
                 paths.append(path)
 

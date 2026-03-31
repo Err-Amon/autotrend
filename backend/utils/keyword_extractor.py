@@ -135,26 +135,42 @@ def extract_keywords(text: str, max_keywords: int = 5) -> list[str]:
 
 
 def extract_keywords_with_groq(script: str, max_keywords: int = 5) -> list[str]:
+
     if not script:
         return []
 
     try:
         messages = [
             {
+                "role": "system",
+                "content": (
+                    "You are a video production assistant. Your job is to analyse a video script "
+                    "and produce short stock-video search queries that will find footage that "
+                    "visually matches the script's core topic. "
+                    "Rules:\n"
+                    "- Identify the main subject/theme of the script first.\n"
+                    "- Each query must be 1-3 words, concrete, and directly related to that theme.\n"
+                    "- Prefer specific nouns and actions over vague adjectives.\n"
+                    "- Do NOT use generic terms like 'people', 'background', 'abstract', 'concept'.\n"
+                    "- Output ONLY a comma-separated list of queries, nothing else."
+                ),
+            },
+            {
                 "role": "user",
                 "content": (
-                    f"Extract {max_keywords} key visual keywords from this video script for stock video search. "
-                    f"Focus on nouns, objects, scenes, actions that can be depicted in videos. "
-                    f"Keywords should be relevant to finding matching video clips. "
-                    f"Output only comma-separated keywords, no explanations or extra text.\n\nScript: {script}"
+                    f"Script topic: analyse the script below and return exactly {max_keywords} "
+                    f"stock-video search queries that best represent its visual content.\n\n"
+                    f"Script:\n{script}"
                 ),
-            }
+            },
         ]
-        response = groq_chat(messages, max_tokens=100)
+        response = groq_chat(messages, max_tokens=120)
         if response:
             keywords = [k.strip().lower() for k in response.split(",") if k.strip()]
+            # Discard any item that looks like a sentence (more than 4 words)
+            keywords = [k for k in keywords if len(k.split()) <= 4]
             keywords = keywords[:max_keywords]
-            logger.info(f"Groq extracted keywords: {keywords}")
+            logger.info(f"Groq extracted visual queries: {keywords}")
             return keywords
         else:
             logger.warning("Groq keyword extraction returned empty, falling back")

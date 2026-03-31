@@ -159,7 +159,7 @@ function Field({ label, fieldKey, type, hint, required }) {
               padding: "0 4px",
             }}
           >
-            {show ? "🙈" : "👁"}
+            {show ? "" : ""}
           </button>
         )}
       </div>

@@ -31,10 +31,11 @@ PIPER_MODEL_PATH: str = os.getenv(
     "PIPER_MODEL_PATH",
     str(PROJECT_ROOT / "models" / "en_US-lessac-medium.onnx"),
 )
-# TopMediaAI TTS
-USE_TOPMEDIAAI: bool = os.getenv("USE_TOPMEDIAAI", "False").lower() == "true"
-TOPMEDIAAI_API_KEY: str = os.getenv("TOPMEDIAAI_API_KEY", "")
-TOPMEDIAAI_VOICE: str = os.getenv("TOPMEDIAAI_VOICE", "female-1")
+# Google AI Studio TTS (Gemini)
+USE_GOOGLE_TTS: bool = os.getenv("USE_GOOGLE_TTS", "False").lower() == "true"
+GOOGLE_AI_STUDIO_API_KEY: str = os.getenv("GOOGLE_AI_STUDIO_API_KEY", "")
+GOOGLE_TTS_VOICE: str = os.getenv("GOOGLE_TTS_VOICE", "Aoede")
+GOOGLE_TTS_MODEL: str = os.getenv("GOOGLE_TTS_MODEL", "gemini-2.5-flash-preview-tts")
 # Logging
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 

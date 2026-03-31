@@ -169,7 +169,7 @@ export default function Dashboard() {
             letterSpacing: "0.02em",
           }}
         >
-          {loading ? "Queuing..." : "⚡ Generate Video"}
+          {loading ? "Queuing..." : " Generate Video"}
         </button>
 
         {runningCount > 0 && (

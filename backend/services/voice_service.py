@@ -2,14 +2,19 @@ import os
 import re
 import subprocess
 import shutil
+import struct
+import wave
+import io
+import base64
 import requests
 from config import (
     AUDIO_DIR,
     PIPER_EXECUTABLE,
     PIPER_MODEL_PATH,
-    USE_TOPMEDIAAI,
-    TOPMEDIAAI_API_KEY,
-    TOPMEDIAAI_VOICE,
+    USE_GOOGLE_TTS,
+    GOOGLE_AI_STUDIO_API_KEY,
+    GOOGLE_TTS_VOICE,
+    GOOGLE_TTS_MODEL,
 )
 from utils.logger import get_logger
 
@@ -57,112 +62,160 @@ def _validate_audio_file(path: str, job_id: str) -> bool:
         return True
 
 
-def _generate_voice_topmediaai(text: str, job_id: str, output_path: str) -> str | None:
-    logger.info(f"[{job_id}] Using TopMediaAI TTS")
+def _pcm_to_wav(
+    pcm_data: bytes, sample_rate: int = 24000, channels: int = 1, sample_width: int = 2
+) -> bytes:
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as wf:
+        wf.setnchannels(channels)
+        wf.setsampwidth(sample_width)
+        wf.setframerate(sample_rate)
+        wf.writeframes(pcm_data)
+    return buf.getvalue()
+
+
+def _generate_voice_google_tts(text: str, job_id: str, output_path: str) -> str | None:
+    logger.info(
+        f"[{job_id}] Using Google AI Studio Gemini TTS (model: {GOOGLE_TTS_MODEL}, voice: {GOOGLE_TTS_VOICE})"
+    )
+
+    url = (
+        f"https://generativelanguage.googleapis.com/v1beta/models/"
+        f"{GOOGLE_TTS_MODEL}:generateContent?key={GOOGLE_AI_STUDIO_API_KEY}"
+    )
+
+    payload = {
+        "contents": [{"parts": [{"text": text}]}],
+        "generationConfig": {
+            "responseModalities": ["AUDIO"],
+            "speechConfig": {
+                "voiceConfig": {"prebuiltVoiceConfig": {"voiceName": GOOGLE_TTS_VOICE}}
+            },
+        },
+    }
 
     try:
         response = requests.post(
-            "https://api.topmediaai.com/v1/tts",
-            headers={
-                "Authorization": f"Bearer {TOPMEDIAAI_API_KEY}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "voice": TOPMEDIAAI_VOICE,
-                "text": text,
-                "format": "mp3",
-            },
-            timeout=90,
+            url,
+            headers={"Content-Type": "application/json"},
+            json=payload,
+            timeout=120,
         )
     except requests.exceptions.Timeout:
-        logger.warning(f"[{job_id}] TopMediaAI request timed out")
+        logger.warning(f"[{job_id}] Google AI Studio TTS request timed out")
         return None
     except Exception as e:
-        logger.warning(f"[{job_id}] TopMediaAI request error: {e}")
+        logger.warning(f"[{job_id}] Google AI Studio TTS request error: {e}")
         return None
 
     if response.status_code != 200:
         logger.warning(
-            f"[{job_id}] TopMediaAI HTTP {response.status_code}: {response.text[:300]}"
+            f"[{job_id}] Google AI Studio TTS HTTP {response.status_code}: {response.text[:500]}"
         )
         return None
 
-    content_type = response.headers.get("Content-Type", "").lower()
-    logger.debug(f"[{job_id}] TopMediaAI Content-Type: {content_type}")
+    try:
+        data = response.json()
+    except Exception as e:
+        logger.warning(f"[{job_id}] Google AI Studio TTS JSON parse error: {e}")
+        return None
 
-    audio_bytes: bytes | None = None
-
-    # Case A: response body IS the audio
-    if "audio" in content_type or "octet-stream" in content_type:
-        audio_bytes = response.content
-
-    # Case B: response body is JSON — look for a URL to download
-    elif "json" in content_type or response.content.lstrip()[:1] == b"{":
-        try:
-            data = response.json()
-            logger.debug(
-                f"[{job_id}] TopMediaAI JSON response keys: {list(data.keys())}"
+    # Navigate the Gemini response structure to extract audio data
+    try:
+        candidates = data.get("candidates", [])
+        if not candidates:
+            logger.warning(
+                f"[{job_id}] Google AI Studio TTS: no candidates in response"
             )
-            # Common field names used by various TTS APIs
-            audio_url = (
-                data.get("audio_url")
-                or data.get("url")
-                or data.get("audio")
-                or data.get("download_url")
-                or data.get("file_url")
-            )
-            if not audio_url:
-                logger.warning(
-                    f"[{job_id}] TopMediaAI JSON has no audio URL field. "
-                    f"Full response: {data}"
-                )
-                return None
-
-            logger.info(f"[{job_id}] TopMediaAI: downloading audio from {audio_url}")
-            dl = requests.get(audio_url, timeout=60)
-            if dl.status_code != 200:
-                logger.warning(
-                    f"[{job_id}] TopMediaAI audio download failed: HTTP {dl.status_code}"
-                )
-                return None
-            audio_bytes = dl.content
-
-        except Exception as e:
-            logger.warning(f"[{job_id}] TopMediaAI JSON parse/download error: {e}")
             return None
-    else:
-        # Unknown content type — try treating as raw audio anyway
-        logger.warning(
-            f"[{job_id}] TopMediaAI unknown Content-Type '{content_type}', "
-            f"attempting to treat as raw audio"
-        )
-        audio_bytes = response.content
 
-    if not audio_bytes or len(audio_bytes) < 1024:
+        parts = candidates[0].get("content", {}).get("parts", [])
+        if not parts:
+            logger.warning(f"[{job_id}] Google AI Studio TTS: no parts in candidate")
+            return None
+
+        inline_data = parts[0].get("inlineData", {})
+        mime_type = inline_data.get("mimeType", "")
+        audio_b64 = inline_data.get("data", "")
+
+        if not audio_b64:
+            logger.warning(
+                f"[{job_id}] Google AI Studio TTS: no audio data in response. "
+                f"Response keys: {list(data.keys())}"
+            )
+            return None
+
+        audio_bytes = base64.b64decode(audio_b64)
+
+    except Exception as e:
         logger.warning(
-            f"[{job_id}] TopMediaAI returned suspiciously small payload "
+            f"[{job_id}] Google AI Studio TTS: failed to extract audio data: {e}"
+        )
+        return None
+
+    if not audio_bytes or len(audio_bytes) < 512:
+        logger.warning(
+            f"[{job_id}] Google AI Studio TTS returned suspiciously small payload "
             f"({len(audio_bytes) if audio_bytes else 0} bytes) — discarding"
         )
         return None
 
-    # Write to disk
+    # Gemini TTS returns raw PCM (L16) audio — wrap in WAV container
+    # then convert to MP3 via ffmpeg for compatibility
     try:
-        with open(output_path, "wb") as f:
-            f.write(audio_bytes)
+        # Determine sample rate from mime_type if available (e.g. "audio/L16;rate=24000")
+        sample_rate = 24000
+        if "rate=" in mime_type:
+            try:
+                sample_rate = int(mime_type.split("rate=")[1].split(";")[0].strip())
+            except (ValueError, IndexError):
+                pass
+
+        wav_bytes = _pcm_to_wav(audio_bytes, sample_rate=sample_rate)
+
+        # Convert WAV → MP3 using ffmpeg
+        ffmpeg_proc = subprocess.run(
+            [
+                "ffmpeg",
+                "-y",
+                "-f",
+                "wav",
+                "-i",
+                "pipe:0",
+                "-codec:a",
+                "libmp3lame",
+                "-q:a",
+                "2",
+                output_path,
+            ],
+            input=wav_bytes,
+            capture_output=True,
+            timeout=60,
+        )
+
+        if ffmpeg_proc.returncode != 0:
+            stderr = ffmpeg_proc.stderr.decode("utf-8", errors="replace")
+            logger.error(f"[{job_id}] ffmpeg WAV→MP3 conversion failed: {stderr}")
+            return None
+
     except Exception as e:
-        logger.error(f"[{job_id}] Could not write TopMediaAI audio: {e}")
+        logger.error(f"[{job_id}] Google AI Studio TTS audio conversion error: {e}")
         return None
 
-    # Validate
+    # Validate the final MP3
     if not _validate_audio_file(output_path, job_id):
-        logger.error(f"[{job_id}] TopMediaAI audio failed validation — removing file")
+        logger.error(
+            f"[{job_id}] Google AI Studio TTS audio failed validation — removing file"
+        )
         try:
             os.remove(output_path)
         except OSError:
             pass
         return None
 
-    logger.info(f"[{job_id}] TopMediaAI voice generated: {output_path}")
+    logger.info(
+        f"[{job_id}] Google AI Studio Gemini TTS voice generated: {output_path}"
+    )
     return output_path
 
 
@@ -179,15 +232,18 @@ def generate_voice(script: str, job_id: str, audio_dir: str = "") -> str | None:
     os.makedirs(save_dir, exist_ok=True)
     output_path = os.path.join(save_dir, "audio.mp3")
 
-    if USE_TOPMEDIAAI and TOPMEDIAAI_API_KEY:
-        topmedia_result = _generate_voice_topmediaai(
+    if USE_GOOGLE_TTS and GOOGLE_AI_STUDIO_API_KEY:
+        google_result = _generate_voice_google_tts(
             script_with_pauses, job_id, output_path
         )
-        if topmedia_result:
-            return topmedia_result
-        # Fall through to Piper if TopMediaAI failed
+        if google_result:
+            return google_result
+        # Fall through to Piper if Google TTS failed
+        logger.warning(
+            f"[{job_id}] Google AI Studio TTS failed — falling back to Piper TTS"
+        )
 
-    logger.info(f"[{job_id}] Falling back to Piper TTS")
+    logger.info(f"[{job_id}] Using Piper TTS")
 
     if not shutil.which(PIPER_EXECUTABLE):
         logger.error(f"[{job_id}] Piper not found: {PIPER_EXECUTABLE}")

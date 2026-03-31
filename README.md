@@ -1,8 +1,8 @@
 # AutoTrend Video Factory
 
-A desktop tool that automates short-form video creation end-to-end. It collects trending topics, generates a script using an LLM, converts it to voice narration, downloads matching stock clips, assembles a vertical video with subtitles, and uploads to YouTube Shorts, Instagram Reels, and Facebook Reels.
+A desktop tool that automates short-form video creation end-to-end. It collects trending topics, generates a script using an LLM, converts it to voice narration using Google AI Studio Gemini TTS (with Piper TTS as an offline fallback), downloads matching stock clips, assembles a vertical video with synchronised subtitles, and uploads to YouTube Shorts, Instagram Reels, and Facebook Reels.
 
-Runs on 8GB RAM, CPU only. No paid APIs. No heavy local AI models.
+Runs on 8GB RAM, CPU only.
 
 ---
 
@@ -11,14 +11,14 @@ Runs on 8GB RAM, CPU only. No paid APIs. No heavy local AI models.
 - Python 3.10 or higher
 - Node.js 18 or higher
 - FFmpeg installed and available in system PATH
-- Piper TTS binary and voice model (see API section below)
+- Piper TTS binary and voice model (used as fallback if Google TTS is not configured)
 
 ---
 
 ## Project Structure
 
 ```
-auto-video-factory/
+autotrend/
 ├── .env
 ├── requirements.txt
 ├── package.json
@@ -69,15 +69,9 @@ Mac: `brew install ffmpeg`
 
 Verify: `ffmpeg -version`
 
-### 5. Install Piper TTS
+### 5. Configure environment
 
-Download the binary for your OS from github.com/rhasspy/piper/releases. Extract it and either place the executable in the project root or add its folder to your system PATH.
-
-Download the voice model from huggingface.co/rhasspy/piper-voices. Navigate to en/en_US/lessac/medium and download both the .onnx file and the .onnx.json config file. Place both in `auto-video-factory/models/`.
-
-### 6. Configure environment
-
-Copy the `.env` file and fill in your API keys. At minimum you need GROQ_API_KEY and PEXELS_API_KEY to run the pipeline.
+Copy `.env.example` to `.env` and fill in your API keys. At minimum you need GROQ_API_KEY and PEXELS_API_KEY to run the pipeline.
 
 ---
 
@@ -100,7 +94,7 @@ npm run dev
 
 The Electron desktop window will open automatically once Vite is ready.
 
-To run frontend only in browser (without Electron):
+To run the frontend only in a browser (without Electron):
 
 ```bash
 npm run dev:vite
@@ -112,7 +106,7 @@ Then open http://localhost:5173 in your browser.
 
 ## APIs and Resources
 
-### Groq (LLM — script generation and trend filtering)
+### Groq (LLM — script generation, trend filtering, and visual keyword extraction)
 
 Free cloud API. No credit card required.
 
@@ -123,6 +117,37 @@ Free cloud API. No credit card required.
 
 Model used: llama3-8b-8192
 
+Groq is also used to analyse the generated script and extract visual search queries that are used to fetch relevant stock clips from Pexels and Pixabay.
+
+
+### Google AI Studio (Gemini TTS — voice narration)
+
+Free API. Used as the primary TTS engine.
+
+1. Go to aistudio.google.com
+2. Sign in with your Google account
+3. Click "Get API key" and create a new key
+4. Copy the key into GOOGLE_AI_STUDIO_API_KEY in .env
+5. Set USE_GOOGLE_TTS=True in .env
+
+Model used: gemini-2.5-flash-preview-tts
+
+Available voices: Aoede, Charon, Fenrir, Kore, Puck (set via GOOGLE_TTS_VOICE in .env).
+
+If USE_GOOGLE_TTS is False or the key is missing, the pipeline automatically falls back to Piper TTS.
+
+
+### Piper TTS (offline voice generation — fallback)
+
+Free and open source. Runs fully offline. No account or API key needed. Used when Google TTS is not configured or fails.
+
+Binary: github.com/rhasspy/piper/releases
+Voice model: huggingface.co/rhasspy/piper-voices under en/en_US/lessac/medium
+
+Download both the .onnx model file and the .onnx.json config file and place them in the models/ directory inside the project root.
+
+Set PIPER_EXECUTABLE and PIPER_MODEL_PATH in .env to point to the binary and model file.
+
 
 ### Pexels (stock video clips)
 
@@ -132,6 +157,8 @@ Free API with generous limits.
 2. Sign in or create an account
 3. Your API key is shown on the dashboard immediately after signing in
 4. Copy it into PEXELS_API_KEY in .env
+
+The pipeline fetches clips using multiple visual search queries extracted from the script by Groq, so the footage matches the actual topic of the video.
 
 
 ### Pixabay (stock video clips — fallback)
@@ -198,16 +225,6 @@ Free. Requires a Professional Instagram account (Creator or Business) linked to 
 Note: Instagram upload requires the final video to be hosted at a publicly accessible HTTPS URL. Pass this URL as video_public_url inside the upload_config when triggering a job via the API.
 
 
-### Piper TTS (offline voice generation)
-
-Free and open source. Runs fully offline. No account or API key needed.
-
-Binary: github.com/rhasspy/piper/releases
-Voice model: huggingface.co/rhasspy/piper-voices under en/en_US/lessac/medium
-
-Download both the .onnx model file and the .onnx.json config file and place them in the models/ directory inside the project root.
-
-
 ### FFmpeg (video assembly)
 
 Free and open source. Required for all video processing.
@@ -222,7 +239,7 @@ To generate a video without uploading, you only need:
 
 - GROQ_API_KEY
 - PEXELS_API_KEY
-- Piper TTS installed with model file
+- GOOGLE_AI_STUDIO_API_KEY with USE_GOOGLE_TTS=True (or Piper TTS installed as fallback)
 - FFmpeg installed
 
 All upload keys (YouTube, Facebook, Instagram) are optional and only needed if you want to publish the finished video automatically.
@@ -245,7 +262,8 @@ All upload keys (YouTube, Facebook, Instagram) are optional and only needed if y
 | Build tool | Vite 5 |
 | Backend | Python + FastAPI |
 | LLM | Groq API (llama3-8b-8192) |
-| Voice | Piper TTS (offline) |
+| Voice (primary) | Google AI Studio Gemini TTS (gemini-2.5-flash-preview-tts) |
+| Voice (fallback) | Piper TTS (offline) |
 | Trend sources | Google News RSS, YouTube RSS, HackerNews API, Google Trends |
 | Stock video | Pexels API, Pixabay API |
 | Video assembly | FFmpeg |
