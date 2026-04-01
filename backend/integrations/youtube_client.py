@@ -4,8 +4,13 @@ from utils.logger import get_logger
 logger = get_logger(__name__)
 
 SCOPES = ["https://www.googleapis.com/auth/youtube.upload"]
-TOKEN_FILE = "token.json"
-CLIENT_SECRETS_FILE = "client_secrets.json"
+
+# Get the project root (two levels up from this file)
+PROJECT_ROOT = os.path.dirname(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+)
+TOKEN_FILE = os.path.join(PROJECT_ROOT, "token.json")
+CLIENT_SECRETS_FILE = os.path.join(PROJECT_ROOT, "client_secrets.json")
 
 
 def _get_credentials():

@@ -1,5 +1,5 @@
 import os
-from integrations.groq_client import groq_chat
+from integrations.gemini_client import gemini_chat
 from config import SCRIPTS_DIR
 from utils.logger import get_logger
 
@@ -30,7 +30,7 @@ def generate_script(
                 f"- Keep narration text ONLY — no stage directions, no scene labels, no [brackets]\n"
                 f"- Include natural rhythm and pacing to engage viewers\n"
                 f"- Use vivid, relatable examples or metaphors when possible\n"
-                f"- Total length: 80 to 120 words\n"
+                f"- Total length: 100 to 120 words\n"
                 f"- Tone: engaging, confident, fast-paced, and energetic\n"
                 f"- Add subtle variation in phrasing each time to make scripts unique\n\n"
                 f"Output ONLY the script text — nothing else, no explanations, no extra formatting."
@@ -38,7 +38,7 @@ def generate_script(
         }
     ]
 
-    script = groq_chat(messages, max_tokens=350)
+    script = gemini_chat(messages, max_tokens=5000)
 
     if not script:
         logger.error(f"[{job_id}] Script generation returned empty")

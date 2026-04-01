@@ -65,38 +65,37 @@ def assemble_video(
 
         if subtitle_path and os.path.exists(subtitle_path):
             escaped = _escape_subtitle_path(subtitle_path)
-            # ── Subtitle style: clean, modern, mobile-friendly ─────────────
-            # FontName=DejaVu Sans — crisp, open-source, always on Linux;
-            #                        much more readable than Arial at small sizes
-            # FontSize=28          — proportionate for 1080×1920 portrait video
-            # Bold=1               — bold weight for impact
-            # PrimaryColour        — warm white (slightly off-white) text
-            # OutlineColour        — pure black outline for contrast on any bg
-            # Outline=2            — solid outline so text pops on busy clips
-            # Shadow=1             — subtle drop-shadow for depth
-            # ShadowColour         — semi-transparent black shadow
-            # BackColour           — transparent (no opaque box)
-            # BorderStyle=1        — outline+shadow mode (no box)
-            # Alignment=2          — bottom-centre (standard subtitle position)
-            # MarginV=55           — comfortable distance from the bottom edge
-            # MarginL/R=35         — side margins so text never clips the edge
+            # ── Subtitle style: bold, high-contrast, engagement-optimized ──
+            # FontName=Noto Sans  — clean, modern, highly readable sans-serif
+            # FontSize=20         — compact size that doesn't obscure video
+            # Bold=1              — bold weight for maximum readability
+            # PrimaryColour      — bright white text for pop on any background
+            # OutlineColour      — thick black outline for contrast
+            # Outline=3          — heavy outline so text is always legible
+            # Shadow=2           — stronger shadow for depth perception
+            # ShadowColour       — dark shadow for 3D lift effect
+            # BackColour         — transparent (no opaque box)
+            # BorderStyle=1      — outline+shadow mode (no box)
+            # Alignment=2        — bottom-centre (standard subtitle position)
+            # MarginV=70         — more distance from bottom edge for comfort
+            # MarginL/R=40       — side margins so text never clips
             vf_filter += (
                 f",subtitles='{escaped}'"
                 f":force_style='"
-                f"FontName=DejaVu Sans,"
-                f"FontSize=28,"
+                f"FontName=Noto Sans,"
+                f"FontSize=20,"
                 f"Bold=1,"
-                f"PrimaryColour=&H00F5F5F5,"
+                f"PrimaryColour=&H00FFFFFF,"
                 f"OutlineColour=&H00000000,"
-                f"Outline=2,"
-                f"Shadow=1,"
-                f"ShadowColour=&HA0000000,"
+                f"Outline=3,"
+                f"Shadow=2,"
+                f"ShadowColour=&H80000000,"
                 f"BackColour=&H00000000,"
                 f"BorderStyle=1,"
                 f"Alignment=2,"
-                f"MarginV=55,"
-                f"MarginL=35,"
-                f"MarginR=35'"
+                f"MarginV=70,"
+                f"MarginL=40,"
+                f"MarginR=40'"
             )
 
         cmd = [

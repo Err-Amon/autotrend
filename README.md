@@ -71,7 +71,7 @@ Verify: `ffmpeg -version`
 
 ### 5. Configure environment
 
-Copy `.env.example` to `.env` and fill in your API keys. At minimum you need GROQ_API_KEY and PEXELS_API_KEY to run the pipeline.
+Copy `.env.example` to `.env` and fill in your API keys. At minimum you need GOOGLE_AI_STUDIO_API_KEY and PEXELS_API_KEY to run the pipeline.
 
 ---
 
@@ -106,18 +106,18 @@ Then open http://localhost:5173 in your browser.
 
 ## APIs and Resources
 
-### Groq (LLM — script generation, trend filtering, and visual keyword extraction)
+### Google AI Studio (Gemini LLM — script generation, trend filtering, and visual keyword extraction)
 
-Free cloud API. No credit card required.
+Free API. No credit card required.
 
-1. Go to console.groq.com
-2. Sign up or log in
-3. Go to API Keys and create a new key
-4. Copy the key into GROQ_API_KEY in .env
+1. Go to aistudio.google.com
+2. Sign in with your Google account
+3. Click "Get API key" and create a new key
+4. Copy the key into GOOGLE_AI_STUDIO_API_KEY in .env
 
-Model used: llama3-8b-8192
+Model used: gemini-2.5-flash
 
-Groq is also used to analyse the generated script and extract visual search queries that are used to fetch relevant stock clips from Pexels and Pixabay.
+Gemini is also used to analyse the generated script and extract visual search queries that are used to fetch relevant stock clips from Pexels and Pixabay.
 
 
 ### Google AI Studio (Gemini TTS — voice narration)
@@ -158,7 +158,7 @@ Free API with generous limits.
 3. Your API key is shown on the dashboard immediately after signing in
 4. Copy it into PEXELS_API_KEY in .env
 
-The pipeline fetches clips using multiple visual search queries extracted from the script by Groq, so the footage matches the actual topic of the video.
+The pipeline fetches clips using multiple visual search queries extracted from the script by Gemini, so the footage matches the actual topic of the video.
 
 
 ### Pixabay (stock video clips — fallback)
@@ -237,9 +237,8 @@ ffmpeg.org — download for your platform.
 
 To generate a video without uploading, you only need:
 
-- GROQ_API_KEY
+- GOOGLE_AI_STUDIO_API_KEY
 - PEXELS_API_KEY
-- GOOGLE_AI_STUDIO_API_KEY with USE_GOOGLE_TTS=True (or Piper TTS installed as fallback)
 - FFmpeg installed
 
 All upload keys (YouTube, Facebook, Instagram) are optional and only needed if you want to publish the finished video automatically.
@@ -261,7 +260,7 @@ All upload keys (YouTube, Facebook, Instagram) are optional and only needed if y
 | Desktop UI | React 18 + Electron 30 |
 | Build tool | Vite 5 |
 | Backend | Python + FastAPI |
-| LLM | Groq API (llama3-8b-8192) |
+| LLM | Google AI Studio Gemini (gemini-2.5-flash) |
 | Voice (primary) | Google AI Studio Gemini TTS (gemini-2.5-flash-preview-tts) |
 | Voice (fallback) | Piper TTS (offline) |
 | Trend sources | Google News RSS, YouTube RSS, HackerNews API, Google Trends |

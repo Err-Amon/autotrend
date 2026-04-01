@@ -2,13 +2,13 @@ import { useState } from "react";
 
 const SECTIONS = [
   {
-    title: "LLM — Groq",
+    title: "LLM — Google AI Studio",
     fields: [
       {
-        key: "GROQ_API_KEY",
-        label: "Groq API Key",
+        key: "GOOGLE_AI_STUDIO_API_KEY",
+        label: "Google AI Studio API Key",
         type: "password",
-        hint: "Get free key from console.groq.com → API Keys",
+        hint: "Get free key from aistudio.google.com → API Keys",
         required: true,
       },
     ],
@@ -198,7 +198,7 @@ export default function Settings() {
         fontSize: 13,
         color: "#a5b4fc",
       }}>
-        ℹ Minimum required to run the pipeline: <strong>GROQ_API_KEY</strong> and <strong>PEXELS_API_KEY</strong>.
+        ℹ Minimum required to run the pipeline: <strong>GOOGLE_AI_STUDIO_API_KEY</strong> and <strong>PEXELS_API_KEY</strong>.
         All upload keys are optional — you can generate videos without uploading.
       </div>
 

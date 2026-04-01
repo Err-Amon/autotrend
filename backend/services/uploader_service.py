@@ -1,5 +1,5 @@
 import json
-from integrations.groq_client import groq_chat
+from integrations.gemini_client import gemini_chat
 from integrations.youtube_client import upload_to_youtube
 from integrations.facebook_client import upload_to_facebook
 from integrations.instagram_client import upload_to_instagram
@@ -25,7 +25,7 @@ def generate_metadata(script: str, niche: str) -> dict:
         }
     ]
 
-    response = groq_chat(messages, max_tokens=300)
+    response = gemini_chat(messages, max_tokens=300)
 
     if response:
         try:

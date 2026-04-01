@@ -23,9 +23,10 @@ def fetch_pexels_clips(
     headers = {"Authorization": PEXELS_API_KEY}
     params = {
         "query": query,
-        "per_page": count,
+        "per_page": count * 2,  # Fetch more to filter for best matches
         "orientation": "portrait",
         "size": "medium",
+        "locale": "en-US",
     }
 
     paths = []

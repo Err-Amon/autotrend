@@ -1,5 +1,5 @@
 import json
-from integrations.groq_client import groq_chat
+from integrations.gemini_client import gemini_chat
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -41,7 +41,7 @@ def filter_trends_for_niche(trends: list[str], niche: str) -> list[str]:
         }
     ]
 
-    response = groq_chat(messages, max_tokens=200)
+    response = gemini_chat(messages, max_tokens=200)
 
     if not response:
         logger.warning(

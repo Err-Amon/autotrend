@@ -7,9 +7,6 @@ pydantic==2.7.1
 # Environment
 python-dotenv==1.0.1
 
-# Groq LLM
-groq==0.9.0
-
 # HTTP (also used for RSS fetching)
 requests==2.31.0
 

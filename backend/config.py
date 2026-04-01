@@ -5,9 +5,6 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 load_dotenv(dotenv_path=PROJECT_ROOT / ".env")
 
-# LLM
-GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
-
 # Stock video
 PEXELS_API_KEY: str = os.getenv("PEXELS_API_KEY", "")
 PIXABAY_API_KEY: str = os.getenv("PIXABAY_API_KEY", "")
@@ -64,7 +61,7 @@ VIDEO_HEIGHT: int = 1920
 VIDEO_FPS: int = 30
 
 # Minimum required keys for pipeline to run
-REQUIRED_KEYS: list[str] = ["GROQ_API_KEY", "PEXELS_API_KEY"]
+REQUIRED_KEYS: list[str] = ["GOOGLE_AI_STUDIO_API_KEY", "PEXELS_API_KEY"]
 
 
 def validate_env() -> list[str]:

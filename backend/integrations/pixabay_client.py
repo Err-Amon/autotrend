@@ -24,9 +24,10 @@ def fetch_pixabay_clips(
     params = {
         "key": PIXABAY_API_KEY,
         "q": query,
-        "per_page": min(count, 20),
+        "per_page": min(count * 2, 20),  # Fetch more to filter for best matches
         "video_type": "film",
         "safesearch": "true",
+        "lang": "en",
     }
 
     paths = []
