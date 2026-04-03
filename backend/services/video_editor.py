@@ -64,39 +64,43 @@ def assemble_video(
         )
 
         if subtitle_path and os.path.exists(subtitle_path):
-            escaped = _escape_subtitle_path(subtitle_path)
-            # ── Subtitle style: bold, high-contrast, engagement-optimized ──
-            # FontName=Noto Sans  — clean, modern, highly readable sans-serif
-            # FontSize=20         — compact size that doesn't obscure video
-            # Bold=1              — bold weight for maximum readability
-            # PrimaryColour      — bright white text for pop on any background
-            # OutlineColour      — thick black outline for contrast
-            # Outline=3          — heavy outline so text is always legible
-            # Shadow=2           — stronger shadow for depth perception
-            # ShadowColour       — dark shadow for 3D lift effect
-            # BackColour         — transparent (no opaque box)
-            # BorderStyle=1      — outline+shadow mode (no box)
-            # Alignment=2        — bottom-centre (standard subtitle position)
-            # MarginV=70         — more distance from bottom edge for comfort
-            # MarginL/R=40       — side margins so text never clips
-            vf_filter += (
-                f",subtitles='{escaped}'"
-                f":force_style='"
-                f"FontName=Noto Sans,"
-                f"FontSize=20,"
-                f"Bold=1,"
-                f"PrimaryColour=&H00FFFFFF,"
-                f"OutlineColour=&H00000000,"
-                f"Outline=3,"
-                f"Shadow=2,"
-                f"ShadowColour=&H80000000,"
-                f"BackColour=&H00000000,"
-                f"BorderStyle=1,"
-                f"Alignment=2,"
-                f"MarginV=70,"
-                f"MarginL=40,"
-                f"MarginR=40'"
-            )
+            # Try to use ASS format if available (has fade effects)
+            ass_path = subtitle_path.replace(".srt", ".ass")
+            subtitle_file = ass_path if os.path.exists(ass_path) else subtitle_path
+
+            escaped = _escape_subtitle_path(subtitle_file)
+
+            # Check if using ASS (with effects) or SRT (basic)
+            is_ass = subtitle_file.endswith(".ass")
+
+            if is_ass:
+                # ASS format with built-in fade effects - use simpler overlay
+                vf_filter += f",subtitles='{escaped}'"
+                logger.info(f"[{job_id}] Using ASS subtitles with fade effects")
+            else:
+                # SRT format - apply enhanced styling scaled for vertical video
+                vf_filter += (
+                    f",subtitles='{escaped}'"
+                    f":force_style='"
+                    f"FontName=Noto Sans Bold,"
+                    f"FontSize=36,"
+                    f"Bold=1,"
+                    f"PrimaryColour=&H00FFFFFF,"
+                    f"SecondaryColour=&H00FFFF00,"
+                    f"OutlineColour=&H00000000,"
+                    f"BackColour=&H88000000,"
+                    f"Outline=4,"
+                    f"Shadow=5,"
+                    f"ShadowColour=&H99000000,"
+                    f"BorderStyle=1,"
+                    f"Alignment=2,"
+                    f"MarginV=150,"
+                    f"MarginL=60,"
+                    f"MarginR=60,"
+                    f"Spacing=3,"
+                    f"Angle=0'"
+                )
+                logger.info(f"[{job_id}] Using SRT subtitles with enhanced styling")
 
         cmd = [
             "ffmpeg",
@@ -232,12 +236,13 @@ def _run_ffmpeg(cmd: list[str], job_id: str, step: str = ""):
         # Read stderr line by line — prevents pipe buffer deadlock
         # and avoids loading entire stderr into RAM
         stderr_tail: list[str] = []
-        for line in process.stderr:
-            line = line.rstrip()
-            if line:
-                stderr_tail.append(line)
-                if len(stderr_tail) > 20:
-                    stderr_tail.pop(0)
+        if process.stderr:
+            for line in process.stderr:
+                line = line.rstrip()
+                if line:
+                    stderr_tail.append(line)
+                    if len(stderr_tail) > 20:
+                        stderr_tail.pop(0)
 
         # stderr pipe is now drained — wait is safe, no deadlock possible
         try:
