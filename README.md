@@ -2,8 +2,6 @@
 
 A desktop tool that automates short-form video creation end-to-end. It collects trending topics, generates a script using an LLM, converts it to voice narration using Google AI Studio Gemini TTS (with Piper TTS as an offline fallback), downloads matching stock clips, assembles a vertical video with synchronised subtitles, and uploads to YouTube Shorts, Instagram Reels, and Facebook Reels.
 
-Runs on 8GB RAM, CPU only.
-
 ---
 
 ## Requirements
