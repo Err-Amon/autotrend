@@ -1,9 +1,67 @@
 import os
-from integrations.gemini_client import gemini_chat
-from config import SCRIPTS_DIR
 from utils.logger import get_logger
+from integrations.openrouter_client import openrouter_chat
+from utils.keyword_extractor import extract_keywords_with_openrouter
+from config import SCRIPTS_DIR
 
 logger = get_logger(__name__)
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/qwen-3.6-plus")
+
+
+def call_openrouter(
+    model: str, messages: list[dict], max_tokens: int = 1024
+) -> str | None:
+    if not OPENROUTER_API_KEY:
+        logger.error("OPENROUTER_API_KEY is not set")
+        return None
+
+    import requests
+
+    url = "https://openrouter.ai/api/v1/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": 0.7,
+    }
+
+    try:
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        response.raise_for_status()
+        data = response.json()
+
+        logger.info(f"OpenRouter response: {data}")
+
+        choices = data.get("choices", [])
+        if not choices:
+            logger.error("OpenRouter API returned no choices")
+            return None
+
+        content = choices[0].get("message", {}).get("content", "")
+        if not content:
+            logger.error("OpenRouter API returned no content")
+            return None
+
+        logger.info(f"OpenRouter response received ({len(content)} chars)")
+        return content.strip()
+
+    except requests.exceptions.Timeout:
+        logger.error("OpenRouter API request timed out")
+        return None
+    except requests.exceptions.HTTPError as e:
+        logger.error(
+            f"OpenRouter API HTTP error {e.response.status_code}: {e.response.text}"
+        )
+        return None
+    except Exception as e:
+        logger.error(f"OpenRouter API call failed: {e}")
+        return None
 
 
 def generate_script(
@@ -38,7 +96,38 @@ def generate_script(
         }
     ]
 
-    script = gemini_chat(messages, max_tokens=5000)
+    script = None
+    # Try OpenRouter Qwen 3.6 Plus first
+    if OPENROUTER_API_KEY and OPENROUTER_API_KEY != "your_api_key_here":
+        script = openrouter_chat(messages, max_tokens=5000)
+        if script and len(script.split()) >= 30:
+            logger.info(f"[{job_id}] Script generated with OpenRouter")
+            return script
+
+    logger.warning(f"[{job_id}] OpenRouter script may need enhancement or failed")
+
+    # Fallback to keyword extraction with OpenRouter if script is not satisfactory
+    if not script or len(script.split()) < 30:
+        logger.warning(f"[{job_id}] Primary script generation may need enhancement")
+        # Extract keywords with OpenRouter to enhance script
+        keywords = extract_keywords_with_openrouter(
+            script or " ".join([msg["content"] for msg in messages]), max_keywords=10
+        )
+        if keywords:
+            keyword_str = ", ".join(keywords)
+            enhancement_messages = [
+                {
+                    "role": "user",
+                    "content": (
+                        f"Enhance this script by incorporating these visual keywords: {keyword_str}. "
+                        f"Maintain the same format and rules as before."
+                    ),
+                }
+            ]
+            enhanced_script = openrouter_chat(enhancement_messages, max_tokens=5000)
+            if enhanced_script and len(enhanced_script.split()) >= 30:
+                script = enhanced_script
+                logger.info(f"[{job_id}] Script enhanced with OpenRouter keywords")
 
     if not script:
         logger.error(f"[{job_id}] Script generation returned empty")

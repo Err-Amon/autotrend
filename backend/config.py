@@ -33,6 +33,10 @@ USE_GOOGLE_TTS: bool = os.getenv("USE_GOOGLE_TTS", "False").lower() == "true"
 GOOGLE_AI_STUDIO_API_KEY: str = os.getenv("GOOGLE_AI_STUDIO_API_KEY", "")
 GOOGLE_TTS_VOICE: str = os.getenv("GOOGLE_TTS_VOICE", "Aoede")
 GOOGLE_TTS_MODEL: str = os.getenv("GOOGLE_TTS_MODEL", "gemini-2.5-flash-preview-tts")
+
+# OpenRouter for script generation and keyword extraction
+OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "openrouter/qwen-3.6-plus")
 # Logging
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 

@@ -1,7 +1,15 @@
 import os
 import subprocess
-from config import FINAL_VIDEOS_DIR, VIDEO_WIDTH, VIDEO_HEIGHT, VIDEO_FPS
+from config import (
+    FINAL_VIDEOS_DIR,
+    VIDEO_WIDTH,
+    VIDEO_HEIGHT,
+    VIDEO_FPS,
+    OPENROUTER_API_KEY,
+    OPENROUTER_MODEL,
+)
 from utils.logger import get_logger
+from integrations.openrouter_client import openrouter_chat
 
 logger = get_logger(__name__)
 
@@ -101,6 +109,43 @@ def assemble_video(
                     f"Angle=0'"
                 )
                 logger.info(f"[{job_id}] Using SRT subtitles with enhanced styling")
+
+            # Try OpenRouter Qwen 3.6 Plus for subtitle generation if no file exists
+            if not os.path.exists(subtitle_path) and OPENROUTER_API_KEY:
+                try:
+                    # Read the script/assumed content and generate subtitles via OpenRouter
+                    script_path = os.path.join(out_dir, "script.txt")
+                    with open(script_path, "r") as f:
+                        script_content = f.read()
+
+                    messages = [
+                        {
+                            "role": "system",
+                            "content": (
+                                "You are a subtitle generation expert. "
+                                "Generate precise subtitles from video script content. "
+                                "Output only the subtitle text with timing markers."
+                            ),
+                        },
+                        {
+                            "role": "user",
+                            "content": (
+                                f"Generate subtitles for this video script:\n{script_content}\n"
+                                f"Return in SRT format with proper timing."
+                            ),
+                        },
+                    ]
+                    subtitle_content = openrouter_chat(messages, max_tokens=2000)
+                    if subtitle_content:
+                        subtitle_path_srt = subtitle_path.replace(".srt", "_auto.srt")
+                        with open(subtitle_path_srt, "w") as f:
+                            f.write(subtitle_content)
+                        subtitle_file = subtitle_path_srt
+                        logger.info(
+                            f"Generated OpenRouter subtitles: {subtitle_path_srt}"
+                        )
+                except Exception as e:
+                    logger.error(f"OpenRouter subtitle generation failed: {e}")
 
         cmd = [
             "ffmpeg",

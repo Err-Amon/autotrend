@@ -104,18 +104,18 @@ Then open http://localhost:5173 in your browser.
 
 ## APIs and Resources
 
-### Google AI Studio (Gemini LLM — script generation, trend filtering, and visual keyword extraction)
+### OpenRouter (Qwen 3.6 Plus LLM — script generation, trend filtering, and visual keyword extraction)
 
-Free API. No credit card required.
+Free/Paid API via OpenRouter.
 
-1. Go to aistudio.google.com
-2. Sign in with your Google account
-3. Click "Get API key" and create a new key
-4. Copy the key into GOOGLE_AI_STUDIO_API_KEY in .env
+1. Go to openrouter.ai
+2. Sign in and create an API key
+3. Copy the key into OPENROUTER_API_KEY in .env
+4. Set OPENROUTER_MODEL=openrouter/qwen-3.6-plus in .env
 
-Model used: gemini-2.5-flash
+Model used: qwen-3.6-plus
 
-Gemini is also used to analyse the generated script and extract visual search queries that are used to fetch relevant stock clips from Pexels and Pixabay.
+Qwen 3.6 Plus is used to analyse the generated script and extract visual search queries that are used to fetch relevant stock clips from Pexels and Pixabay.
 
 
 ### Google AI Studio (Gemini TTS — voice narration)
@@ -258,7 +258,7 @@ All upload keys (YouTube, Facebook, Instagram) are optional and only needed if y
 | Desktop UI | React 18 + Electron 30 |
 | Build tool | Vite 5 |
 | Backend | Python + FastAPI |
-| LLM | Google AI Studio Gemini (gemini-2.5-flash) |
+| LLM | OpenRouter Qwen 3.6 Plus |
 | Voice (primary) | Google AI Studio Gemini TTS (gemini-2.5-flash-preview-tts) |
 | Voice (fallback) | Piper TTS (offline) |
 | Trend sources | Google News RSS, YouTube RSS, HackerNews API, Google Trends |

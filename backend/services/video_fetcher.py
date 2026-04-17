@@ -1,5 +1,9 @@
 import re
-from utils.keyword_extractor import extract_keywords_with_groq, get_visual_description
+from utils.keyword_extractor import (
+    extract_keywords_with_openrouter,
+    get_visual_description,
+    extract_keywords,
+)
 from integrations.pexels_client import fetch_pexels_clips
 from integrations.pixabay_client import fetch_pixabay_clips
 from utils.logger import get_logger
@@ -45,8 +49,10 @@ def _refine_query(query: str) -> str:
 
 
 def fetch_clips_for_script(script: str, clips_dir: str, job_id: str) -> list[str]:
-
-    keywords = extract_keywords_with_groq(script, max_keywords=5)
+    keywords = extract_keywords_with_openrouter(script, max_keywords=5)
+    if not keywords:
+        # Fallback to local keyword extraction
+        keywords = extract_keywords(script, max_keywords=5)
 
     if not keywords:
         logger.warning(f"[{job_id}] No keywords extracted, using fallback: 'nature'")

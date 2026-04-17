@@ -1,8 +1,13 @@
 import re
-from integrations.gemini_client import gemini_chat
+import os
+import requests
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
+
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/qwen-3.6-plus")
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 STOPWORDS = {
     "the",
@@ -134,9 +139,60 @@ def extract_keywords(text: str, max_keywords: int = 5) -> list[str]:
         return []
 
 
-def extract_keywords_with_groq(script: str, max_keywords: int = 5) -> list[str]:
+def call_openrouter(
+    model: str, messages: list[dict], max_tokens: int = 1024
+) -> str | None:
+    if not OPENROUTER_API_KEY:
+        logger.error("OPENROUTER_API_KEY is not set")
+        return None
 
-    if not script:
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Content-Type": "application/json",
+    }
+
+    payload = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": 0.7,
+    }
+
+    try:
+        response = requests.post(
+            OPENROUTER_URL, json=payload, headers=headers, timeout=30
+        )
+        response.raise_for_status()
+        data = response.json()
+
+        choices = data.get("choices", [])
+        if not choices:
+            logger.error("OpenRouter API returned no choices")
+            return None
+
+        content = choices[0].get("message", {}).get("content", "")
+        if not content:
+            logger.error("OpenRouter API returned no content")
+            return None
+
+        logger.info(f"OpenRouter response received ({len(content)} chars)")
+        return content.strip()
+
+    except requests.exceptions.Timeout:
+        logger.error("OpenRouter API request timed out")
+        return None
+    except requests.exceptions.HTTPError as e:
+        logger.error(
+            f"OpenRouter API HTTP error {e.response.status_code}: {e.response.text}"
+        )
+        return None
+    except Exception as e:
+        logger.error(f"OpenRouter API call failed: {e}")
+        return None
+
+
+def extract_keywords_with_openrouter(script: str, max_keywords: int = 5) -> list[str]:
+    if not script or not OPENROUTER_API_KEY:
         return []
 
     try:
@@ -166,7 +222,7 @@ def extract_keywords_with_groq(script: str, max_keywords: int = 5) -> list[str]:
                 ),
             },
         ]
-        response = gemini_chat(messages, max_tokens=120)
+        response = call_openrouter(OPENROUTER_MODEL, messages, max_tokens=120)
         if response:
             keywords = [k.strip().lower() for k in response.split(",") if k.strip()]
             # Discard any item that looks like a sentence (more than 4 words)
@@ -188,13 +244,15 @@ def extract_keywords_with_groq(script: str, max_keywords: int = 5) -> list[str]:
             }
             keywords = [k for k in keywords if not any(g in k for g in generic_terms)]
             keywords = keywords[:max_keywords]
-            logger.info(f"Groq extracted visual queries: {keywords}")
+            logger.info(
+                f"OpenRouter Qwen 3.6 Plus extracted visual queries: {keywords}"
+            )
             return keywords
         else:
-            logger.warning("Groq keyword extraction returned empty, falling back")
+            logger.warning("OpenRouter keyword extraction returned empty, falling back")
             return extract_keywords(script, max_keywords)
     except Exception as e:
-        logger.error(f"Groq keyword extraction failed: {e}, falling back")
+        logger.error(f"OpenRouter keyword extraction failed: {e}, falling back")
         return extract_keywords(script, max_keywords)
 
 
@@ -226,7 +284,7 @@ def get_visual_description(segment: str) -> str:
                 ),
             },
         ]
-        response = gemini_chat(messages, max_tokens=50)
+        response = call_openrouter(OPENROUTER_MODEL, messages, max_tokens=50)
         if response:
             description = response.strip()
             # Filter out generic terms

@@ -1,8 +1,10 @@
 import json
-from integrations.gemini_client import gemini_chat
+import os
 from utils.logger import get_logger
+from integrations.openrouter_client import openrouter_chat
 
 logger = get_logger(__name__)
+OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 
 
 def filter_trends_for_niche(trends: list[str], niche: str) -> list[str]:
@@ -41,11 +43,12 @@ def filter_trends_for_niche(trends: list[str], niche: str) -> list[str]:
         }
     ]
 
-    response = gemini_chat(messages, max_tokens=200)
+    # Use OpenRouter Qwen 3.6 Plus instead of Gemini
+    response = openrouter_chat(messages, max_tokens=200)
 
     if not response:
         logger.warning(
-            "Groq returned no response for trend filtering, using raw trends"
+            "OpenRouter returned no response for trend filtering, using raw trends"
         )
         return trends_sample[:3]
 
