@@ -6,10 +6,11 @@ from config import (
     VIDEO_HEIGHT,
     VIDEO_FPS,
     OPENROUTER_API_KEY,
-    OPENROUTER_MODEL,
+    GROQ_API_KEY,
 )
 from utils.logger import get_logger
 from integrations.openrouter_client import openrouter_chat
+from integrations.groq_client import groq_chat
 
 logger = get_logger(__name__)
 
@@ -135,7 +136,11 @@ def assemble_video(
                             ),
                         },
                     ]
-                    subtitle_content = openrouter_chat(messages, max_tokens=2000)
+                    subtitle_content = None
+                    if OPENROUTER_API_KEY:
+                        subtitle_content = openrouter_chat(messages, max_tokens=2000)
+                    if not subtitle_content and GROQ_API_KEY:
+                        subtitle_content = groq_chat(messages, max_tokens=2000)
                     if subtitle_content:
                         subtitle_path_srt = subtitle_path.replace(".srt", "_auto.srt")
                         with open(subtitle_path_srt, "w") as f:

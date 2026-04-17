@@ -111,11 +111,11 @@ Free/Paid API via OpenRouter.
 1. Go to openrouter.ai
 2. Sign in and create an API key
 3. Copy the key into OPENROUTER_API_KEY in .env
-4. Set OPENROUTER_MODEL=openrouter/qwen-3.6-plus in .env
+4. Set OPENROUTER_MODEL=qwen/qwen2.5-72b-instruct:free in .env
 
-Model used: qwen-3.6-plus
+Model used: google/gemma-4-31b-it:free
 
-Qwen 3.6 Plus is used to analyse the generated script and extract visual search queries that are used to fetch relevant stock clips from Pexels and Pixabay.
+Gemma 4 31B Instruct is used to analyse the generated script and extract visual search queries that are used to fetch relevant stock clips from Pexels and Pixabay.
 
 
 ### Google AI Studio (Gemini TTS — voice narration)

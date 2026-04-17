@@ -2,11 +2,11 @@ import re
 import os
 import requests
 from utils.logger import get_logger
+from config import OPENROUTER_API_KEY, GROQ_API_KEY
 
 logger = get_logger(__name__)
 
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "openrouter/qwen-3.6-plus")
+OPENROUTER_MODEL = os.getenv("OPENROUTER_MODEL", "google/gemma-4-31b-it:free")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
 STOPWORDS = {
@@ -113,37 +113,26 @@ STOPWORDS = {
 }
 
 
-def extract_keywords(text: str, max_keywords: int = 5) -> list[str]:
-    if not text:
-        return []
-
+def _call_api(url: str, headers: dict, payload: dict) -> str | None:
     try:
-        # Extract words of 4+ chars
-        words = re.findall(r"\b[a-zA-Z]{4,}\b", text)
-        words = [w.lower() for w in words if w.lower() not in STOPWORDS]
+        response = requests.post(url, json=payload, headers=headers, timeout=30)
+        response.raise_for_status()
+        data = response.json()
 
-        # Count frequency
-        freq: dict[str, int] = {}
-        for w in words:
-            freq[w] = freq.get(w, 0) + 1
+        choices = data.get("choices", [])
+        if not choices:
+            return None
 
-        # Sort by frequency then alphabetically for determinism
-        sorted_words = sorted(freq.keys(), key=lambda w: (-freq[w], w))
-        keywords = sorted_words[:max_keywords]
-
-        logger.info(f"Extracted keywords: {keywords}")
-        return keywords
-
-    except Exception as e:
-        logger.error(f"Keyword extraction failed: {e}")
-        return []
+        content = choices[0].get("message", {}).get("content", "")
+        return content.strip() if content else None
+    except Exception:
+        return None
 
 
 def call_openrouter(
     model: str, messages: list[dict], max_tokens: int = 1024
 ) -> str | None:
     if not OPENROUTER_API_KEY:
-        logger.error("OPENROUTER_API_KEY is not set")
         return None
 
     headers = {
@@ -158,101 +147,114 @@ def call_openrouter(
         "temperature": 0.7,
     }
 
-    try:
-        response = requests.post(
-            OPENROUTER_URL, json=payload, headers=headers, timeout=30
-        )
-        response.raise_for_status()
-        data = response.json()
+    return _call_api(OPENROUTER_URL, headers, payload)
 
-        choices = data.get("choices", [])
-        if not choices:
-            logger.error("OpenRouter API returned no choices")
-            return None
 
-        content = choices[0].get("message", {}).get("content", "")
-        if not content:
-            logger.error("OpenRouter API returned no content")
-            return None
-
-        logger.info(f"OpenRouter response received ({len(content)} chars)")
-        return content.strip()
-
-    except requests.exceptions.Timeout:
-        logger.error("OpenRouter API request timed out")
-        return None
-    except requests.exceptions.HTTPError as e:
-        logger.error(
-            f"OpenRouter API HTTP error {e.response.status_code}: {e.response.text}"
-        )
-        return None
-    except Exception as e:
-        logger.error(f"OpenRouter API call failed: {e}")
+def call_groq(messages: list[dict], max_tokens: int = 1024) -> str | None:
+    if not GROQ_API_KEY:
         return None
 
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json",
+    }
 
-def extract_keywords_with_openrouter(script: str, max_keywords: int = 5) -> list[str]:
-    if not script or not OPENROUTER_API_KEY:
+    payload = {
+        "model": "llama-3.1-8b-instant",
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": 0.7,
+    }
+
+    return _call_api(
+        "https://api.groq.com/openai/v1/chat/completions", headers, payload
+    )
+
+
+def extract_keywords(text: str, max_keywords: int = 5) -> list[str]:
+    if not text:
         return []
 
     try:
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are a video production expert specializing in stock footage selection. "
-                    "Your task is to analyze a video script and generate highly specific, visual search queries "
-                    "that will find stock video clips that perfectly match the script's content.\n\n"
-                    "CRITICAL RULES:\n"
-                    "1. Focus on VISUAL elements only - what can be seen on screen\n"
-                    "2. Each query must be 1-3 words, concrete nouns or actions\n"
-                    "3. Prioritize specific objects, activities, settings, and movements\n"
-                    "4. AVOID generic terms: people, person, man, woman, background, abstract, concept, nature, city\n"
-                    "5. AVOID vague adjectives: beautiful, amazing, good, bad, nice\n"
-                    "6. Think: 'What would I actually see in a video of this topic?'\n"
-                    "7. Output ONLY comma-separated queries, no explanations"
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    f"Analyze this script and return exactly {max_keywords} highly specific stock-video search queries "
-                    f"that visually represent the main subject matter. Focus on concrete visual elements.\n\n"
-                    f"Script:\n{script}"
-                ),
-            },
-        ]
-        response = call_openrouter(OPENROUTER_MODEL, messages, max_tokens=120)
-        if response:
-            keywords = [k.strip().lower() for k in response.split(",") if k.strip()]
-            # Discard any item that looks like a sentence (more than 4 words)
-            keywords = [k for k in keywords if len(k.split()) <= 4]
-            # Filter out generic terms that often lead to irrelevant clips
-            generic_terms = {
-                "people",
-                "person",
-                "man",
-                "woman",
-                "background",
-                "abstract",
-                "concept",
-                "nature",
-                "city",
-                "video",
-                "footage",
-                "clip",
-            }
-            keywords = [k for k in keywords if not any(g in k for g in generic_terms)]
-            keywords = keywords[:max_keywords]
-            logger.info(
-                f"OpenRouter Qwen 3.6 Plus extracted visual queries: {keywords}"
-            )
-            return keywords
-        else:
-            logger.warning("OpenRouter keyword extraction returned empty, falling back")
-            return extract_keywords(script, max_keywords)
+        words = re.findall(r"\b[a-zA-Z]{4,}\b", text)
+        words = [w.lower() for w in words if w.lower() not in STOPWORDS]
+
+        freq: dict[str, int] = {}
+        for w in words:
+            freq[w] = freq.get(w, 0) + 1
+
+        sorted_words = sorted(freq.keys(), key=lambda w: (-freq[w], w))
+        keywords = sorted_words[:max_keywords]
+
+        logger.info(f"Extracted keywords: {keywords}")
+        return keywords
+
     except Exception as e:
-        logger.error(f"OpenRouter keyword extraction failed: {e}, falling back")
+        logger.error(f"Keyword extraction failed: {e}")
+        return []
+
+
+def extract_keywords_with_openrouter(script: str, max_keywords: int = 5) -> list[str]:
+    if not script:
+        return []
+
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a video production expert specializing in stock footage selection. "
+                "Your task is to analyze a video script and generate highly specific, visual search queries "
+                "that will find stock video clips that perfectly match the script's content.\n\n"
+                "CRITICAL RULES:\n"
+                "1. Focus on VISUAL elements only - what can be seen on screen\n"
+                "2. Each query must be 1-3 words, concrete nouns or actions\n"
+                "3. Prioritize specific objects, activities, settings, and movements\n"
+                "4. AVOID generic terms: people, person, man, woman, background, abstract, concept, nature, city\n"
+                "5. AVOID vague adjectives: beautiful, amazing, good, bad, nice\n"
+                "6. Think: 'What would I actually see in a video of this topic?'\n"
+                "7. Output ONLY comma-separated queries, no explanations"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"Analyze this script and return exactly {max_keywords} highly specific stock-video search queries "
+                f"that visually represent the main subject matter. Focus on concrete visual elements.\n\n"
+                f"Script:\n{script}"
+            ),
+        },
+    ]
+
+    response = None
+    if OPENROUTER_API_KEY:
+        response = call_openrouter(OPENROUTER_MODEL, messages, max_tokens=120)
+
+    if not response and GROQ_API_KEY:
+        response = call_groq(messages, max_tokens=120)
+
+    if response:
+        keywords = [k.strip().lower() for k in response.split(",") if k.strip()]
+        keywords = [k for k in keywords if len(k.split()) <= 4]
+        generic_terms = {
+            "people",
+            "person",
+            "man",
+            "woman",
+            "background",
+            "abstract",
+            "concept",
+            "nature",
+            "city",
+            "video",
+            "footage",
+            "clip",
+        }
+        keywords = [k for k in keywords if not any(g in k for g in generic_terms)]
+        keywords = keywords[:max_keywords]
+        logger.info(f"Extracted visual queries: {keywords}")
+        return keywords
+    else:
+        logger.warning("API keyword extraction failed, falling back")
         return extract_keywords(script, max_keywords)
 
 
@@ -264,52 +266,50 @@ def get_visual_description(segment: str) -> str:
     if not segment:
         return "nature"
 
-    try:
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "You are a stock footage expert. Given a script segment, describe the most relevant "
-                    "visual scene that would perfectly illustrate this content. "
-                    "Focus on concrete, searchable visual elements - objects, actions, settings, movements. "
-                    "Avoid generic terms like 'people', 'person', 'nature', 'city'. "
-                    "Output only 1-5 words describing the visual scene."
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    f"What specific visual scene would best illustrate this script segment? "
-                    f"Think: 'What would I see on screen?'\n\nSegment: {segment}"
-                ),
-            },
-        ]
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "You are a stock footage expert. Given a script segment, describe the most relevant "
+                "visual scene that would perfectly illustrate this content. "
+                "Focus on concrete, searchable visual elements - objects, actions, settings, movements. "
+                "Avoid generic terms like 'people', 'person', 'nature', 'city'. "
+                "Output only 1-5 words describing the visual scene."
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                f"What specific visual scene would best illustrate this script segment? "
+                f"Think: 'What would I see on screen?'\n\nSegment: {segment}"
+            ),
+        },
+    ]
+
+    response = None
+    if OPENROUTER_API_KEY:
         response = call_openrouter(OPENROUTER_MODEL, messages, max_tokens=50)
-        if response:
-            description = response.strip()
-            # Filter out generic terms
-            generic_terms = {
-                "people",
-                "person",
-                "man",
-                "woman",
-                "nature",
-                "city",
-                "background",
-            }
-            if not any(g in description.lower() for g in generic_terms):
-                logger.info(
-                    f"Visual description: '{description}' for segment: '{segment}'"
-                )
-                return description
-            else:
-                logger.warning(
-                    "Visual description contains generic terms, using segment"
-                )
-                return segment[:50]
+
+    if not response and GROQ_API_KEY:
+        response = call_groq(messages, max_tokens=50)
+
+    if response:
+        description = response.strip()
+        generic_terms = {
+            "people",
+            "person",
+            "man",
+            "woman",
+            "nature",
+            "city",
+            "background",
+        }
+        if not any(g in description.lower() for g in generic_terms):
+            logger.info(f"Visual description: '{description}' for segment: '{segment}'")
+            return description
         else:
-            logger.warning("Groq visual description returned empty, using segment")
-            return segment[:50]  # fallback
-    except Exception as e:
-        logger.error(f"Groq visual description failed: {e}, using segment")
+            logger.warning("Visual description contains generic terms, using segment")
+            return segment[:50]
+    else:
+        logger.warning("API visual description failed, using segment")
         return segment[:50]

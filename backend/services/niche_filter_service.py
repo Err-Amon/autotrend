@@ -2,9 +2,10 @@ import json
 import os
 from utils.logger import get_logger
 from integrations.openrouter_client import openrouter_chat
+from integrations.groq_client import groq_chat
+from config import OPENROUTER_API_KEY, GROQ_API_KEY
 
 logger = get_logger(__name__)
-OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")
 
 
 def filter_trends_for_niche(trends: list[str], niche: str) -> list[str]:
@@ -12,7 +13,6 @@ def filter_trends_for_niche(trends: list[str], niche: str) -> list[str]:
         logger.warning("No trends provided to filter")
         return []
 
-    # Limit input to avoid hitting token limits
     trends_sample = trends[:20]
     trends_text = "\n".join(f"- {t}" for t in trends_sample)
 
@@ -43,17 +43,18 @@ def filter_trends_for_niche(trends: list[str], niche: str) -> list[str]:
         }
     ]
 
-    # Use OpenRouter Qwen 3.6 Plus instead of Gemini
-    response = openrouter_chat(messages, max_tokens=200)
+    response = None
+    if OPENROUTER_API_KEY:
+        response = openrouter_chat(messages, max_tokens=200)
+
+    if not response and GROQ_API_KEY:
+        response = groq_chat(messages, max_tokens=200)
 
     if not response:
-        logger.warning(
-            "OpenRouter returned no response for trend filtering, using raw trends"
-        )
+        logger.warning("All APIs failed for trend filtering, using raw trends")
         return trends_sample[:3]
 
     try:
-        # Strip any accidental markdown fences
         cleaned = response.strip()
         if cleaned.startswith("```"):
             cleaned = cleaned.split("```")[1]

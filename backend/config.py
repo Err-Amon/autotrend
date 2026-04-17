@@ -36,7 +36,12 @@ GOOGLE_TTS_MODEL: str = os.getenv("GOOGLE_TTS_MODEL", "gemini-2.5-flash-preview-
 
 # OpenRouter for script generation and keyword extraction
 OPENROUTER_API_KEY: str = os.getenv("OPENROUTER_API_KEY", "")
-OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "openrouter/qwen-3.6-plus")
+OPENROUTER_MODEL: str = os.getenv("OPENROUTER_MODEL", "google/gemma-4-31b-it:free")
+
+# Groq for fallback
+GROQ_API_KEY: str = os.getenv("GROQ_API_KEY", "")
+GROQ_MODEL: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+
 # Logging
 LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
 
